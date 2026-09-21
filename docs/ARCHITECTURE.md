@@ -50,7 +50,8 @@ Bank account, PAN, Aadhaar reference use `*Enc` columns (application-level AES-G
 | 4 Attendance, Leave, optional Shift | Done (month grid, validated import with preview/confirm, finalize/reopen lock, leave ledger + accrual + requests + encashment, shift behind a per-company flag) |
 | 5 Payroll Engine | Done (pure engine v1.0.0, rule-driven PF/ESI/PT/LWF, OT, arrears/bonus, loans, run workflow DRAFT..LOCKED, unlock audit, bulk payroll). F&F settlement and automatic TDS are not built yet |
 | 6 Compliance framework | Done (versioned rule master with tenant-safe ownership, rule validation, calc preview, automatic TDS, registrations, central compliance calendar with statuses, period summaries) |
-| 7-10 | Schema and migration ready; modules to be built phase by phase |
+| 7 Reports, payslips, Excel/PDF/CSV/Print | Done (16 reports, payslip PDF with branding, CSV/XLSX/PDF/JSON/print, export audit, masked bank details) |
+| 8-10 | Schema and migration ready; modules to be built phase by phase |
 
 ## ERD
 ```mermaid
@@ -111,3 +112,11 @@ Formulas are data, evaluated by a small parser (`salary/formula.ts`), never `eva
 * TDS is rule-driven: slabs, standard deduction, rebate, cess and financial-year start all come from the rule. Monthly TDS = (annual tax on projected taxable income - TDS already deducted this FY) / months left. Projection = YTD from approved runs + this month's taxable earnings x months left. Simplified: no investment declarations or HRA exemption; prior-month taxable is approximated by gross.
 * Calendar: tasks are generated from enabled company modules using `dueDay`/`dueMonthOffset`/`months` stored on the rule (nothing hard-coded). Statuses UPCOMING/DUE_SOON/PENDING/OVERDUE are derived from dates (`computeStatus`) and persisted on read; COMPLETED is manual. Completing a PF/ESI/PT/LWF/TDS filing requires that period's payroll to be APPROVED or LOCKED. The dashboard refreshes statuses before counting.
 * Task actions (assign/complete/reopen) resolve the task's company through the same access check as everything else, so another tenant's task looks like it does not exist.
+
+## Reports and payslips (Phase 7)
+* Every report is reduced to one shape (`ReportResult`: columns, rows, totals, notes). Pure builders (`reports/builders.ts`) turn prepared data into that shape; renderers turn it into CSV, XLSX, PDF or the on-screen table. On-screen Print uses the browser (sidebar and header are hidden by print styles).
+* 16 reports: payroll, salary, wage, deduction, bank statement, OT, PF, ESI, PT, LWF, bonus, gratuity, attendance register, muster roll, leave register, employee ledger. Payroll-based reports read the stored run, so they always match what was calculated; a run that is not approved is marked PROVISIONAL on every format.
+* Statutory figures (PF/ESI/PT wages) come from the stored calculation trace, not from recomputation. Gratuity is rule-driven from a GRATUITY compliance rule (`daysPerYear`, `monthlyDivisor`, `minYears`, `roundUpAfterMonths`, `maxAmount`); with no rule the report shows service and wages only.
+* Safety: CSV text cells that start with = + - @ get an apostrophe (formula injection); XLSX text is always a text cell; downloads set `Content-Disposition: attachment` and `nosniff`. Downloads need `reports.export`; every export and payslip generation is audited. Bank statements show masked account numbers unless the caller has `employee.sensitive`, and full-number exports are audited separately.
+* Payslips: one A4 page per employee, company colour/title/footer configurable in company settings, amount in words (Indian numbering), DRAFT watermark unless the run is approved or locked.
+* Limits: PDF uses built-in fonts (Latin only; the rupee sign prints as "Rs." and other scripts as "?"). Embed a Unicode font before printing Gujarati/Hindi names. PDF and XLSX are capped at 20,000 rows (use CSV). Company logo needs file storage (Phase 9).

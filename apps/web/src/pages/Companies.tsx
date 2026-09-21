@@ -94,6 +94,7 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
   const [tab, setTab] = useState<'basic' | 'settings'>('basic');
   const [form, setForm] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<Settings>({ shiftEnabled: false });
+  const [brand, setBrand] = useState({ primaryColor: '#1e293b', footerText: '', title: '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -103,6 +104,8 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
       const f: Record<string, string> = {};
       TEXT.forEach(([k]) => { f[k] = String((c as unknown as Record<string, unknown>)[k] ?? ''); });
       setForm(f); setSettings(c.settings ?? {});
+      const b = (c.settings as { branding?: Partial<typeof brand> } | null | undefined)?.branding;
+      if (b) setBrand({ primaryColor: b.primaryColor ?? '#1e293b', footerText: b.footerText ?? '', title: b.title ?? '' });
     }).catch((e) => setErr(e.message));
   }, [target]);
 
@@ -116,7 +119,8 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
         delete clean.code; // code is immutable
         if (canEdit) await api(`/companies/${target.id}`, { method: 'PATCH', body: JSON.stringify(clean) });
         if (canSettings) {
-          const body = Object.fromEntries(FLAGS.map(([k]) => [k, !!settings[k]]));
+          const body: Record<string, unknown> = Object.fromEntries(FLAGS.map(([k]) => [k, !!settings[k]]));
+          body.branding = { primaryColor: brand.primaryColor, footerText: brand.footerText, title: brand.title };
           await api(`/companies/${target.id}/settings`, { method: 'PATCH', body: JSON.stringify(body) });
         }
       }
@@ -165,6 +169,16 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
                 {label}
               </label>
             ))}
+          </div>
+        )}
+        {!isNew && tab === 'settings' && (
+          <div className="space-y-2 border-t pt-3">
+            <h3 className="text-sm font-medium">Payslip branding</h3>
+            <div className="flex flex-wrap gap-3 items-end text-xs text-slate-600">
+              <label>Colour<input type="color" className="block mt-1 h-8 w-14" disabled={!canSettings} value={brand.primaryColor} onChange={(e) => setBrand({ ...brand, primaryColor: e.target.value })} /></label>
+              <label>Title<input className="block mt-1 border rounded-md px-2 py-1.5 text-sm text-slate-900 w-40" placeholder="PAYSLIP" disabled={!canSettings} value={brand.title} onChange={(e) => setBrand({ ...brand, title: e.target.value })} /></label>
+              <label className="flex-1 min-w-48">Footer note<input className="block mt-1 w-full border rounded-md px-2 py-1.5 text-sm text-slate-900" disabled={!canSettings} value={brand.footerText} onChange={(e) => setBrand({ ...brand, footerText: e.target.value })} /></label>
+            </div>
           </div>
         )}
 

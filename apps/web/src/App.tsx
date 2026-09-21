@@ -4,6 +4,7 @@ import { api, getSession, setSession, type Session } from './api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
+import Reports from './pages/Reports';
 import Compliance from './pages/Compliance';
 import ComplianceRules from './pages/ComplianceRules';
 import Payroll from './pages/Payroll';
@@ -15,7 +16,7 @@ import Salary from './pages/Salary';
 import Organisation from './pages/Organisation';
 import Companies, { type Company } from './pages/Companies';
 
-type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts' | 'payroll' | 'bulk' | 'compliance' | 'rules';
+type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts' | 'payroll' | 'bulk' | 'compliance' | 'rules' | 'reports';
 
 const NAV: { key: Page | 'soon'; label: string; icon: typeof Users; soon?: boolean }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,7 +31,7 @@ const NAV: { key: Page | 'soon'; label: string; icon: typeof Users; soon?: boole
   { key: 'bulk', label: 'Bulk payroll', icon: Layers },
   { key: 'compliance', label: 'Compliance', icon: ShieldCheck },
   { key: 'rules', label: 'Compliance rules', icon: Scale },
-  { key: 'soon', label: 'Reports', icon: FileText, soon: true },
+  { key: 'reports', label: 'Reports', icon: FileText },
 ];
 
 export default function App() {
@@ -63,7 +64,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex">
-      <aside className={`${open ? 'block' : 'hidden'} md:block w-60 bg-slate-900 text-slate-200 shrink-0 fixed md:static inset-y-0 z-20`}>
+      <aside className={`print:hidden ${open ? 'block' : 'hidden'} md:block w-60 bg-slate-900 text-slate-200 shrink-0 fixed md:static inset-y-0 z-20`}>
         <div className="px-5 py-5 text-lg font-semibold text-white">LabourConsultPro</div>
         <nav className="px-2 space-y-1">
           {NAV.filter((n) => n.key !== 'shifts' || shiftEnabled).map((n) => (
@@ -83,7 +84,7 @@ export default function App() {
       </aside>
 
       <div className="flex-1 min-w-0">
-        <header className="h-14 bg-white border-b flex items-center gap-3 px-4">
+        <header className="print:hidden h-14 bg-white border-b flex items-center gap-3 px-4">
           <button className="md:hidden" onClick={() => setOpen(!open)} aria-label="Menu"><Menu size={20} /></button>
           <label className="text-xs text-slate-500 hidden sm:block">Current company</label>
           <select
@@ -109,6 +110,7 @@ export default function App() {
             ? <div className="text-sm text-slate-600 bg-white border rounded-xl p-6">Select a company from the top bar to continue.</div>
             : page === 'salary' ? <Salary key={companyId} companyId={companyId} session={session} />
             : page === 'employees' ? <Employees key={companyId} companyId={companyId} session={session} />
+            : page === 'reports' ? <Reports key={companyId} companyId={companyId} session={session} />
             : page === 'payroll' ? <Payroll key={companyId} companyId={companyId} session={session} />
             : page === 'attendance' ? <Attendance key={companyId} companyId={companyId} session={session} />
             : page === 'leave' ? <Leave key={companyId} companyId={companyId} session={session} />

@@ -58,6 +58,10 @@ export function validateRule(d: RuleBody): string[] {
     case 'LWF':
       if (!isNum(r.employeeAmount) || r.employeeAmount < 0 || !isNum(r.employerAmount) || r.employerAmount < 0) e.push('LWF needs rules.employeeAmount and rules.employerAmount');
       break;
+    case 'GRATUITY':
+      if (!isNum(r.daysPerYear) || r.daysPerYear <= 0 || !isNum(r.monthlyDivisor) || r.monthlyDivisor <= 0) e.push('GRATUITY needs rules.daysPerYear and rules.monthlyDivisor (both > 0)');
+      for (const k of ['minYears', 'roundUpAfterMonths', 'maxAmount']) if (r[k] != null && (!isNum(r[k]) || r[k] < 0)) e.push(`rules.${k} must be a number >= 0`);
+      break;
     case 'TDS':
       checkBands(d.slabs, 'rate', e);
       if (r.standardDeduction != null && (!isNum(r.standardDeduction) || r.standardDeduction < 0)) e.push('rules.standardDeduction must be >= 0');

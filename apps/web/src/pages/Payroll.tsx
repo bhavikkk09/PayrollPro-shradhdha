@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Trash2, X } from 'lucide-react';
-import { api, type Session } from '../api';
+import { api, download, type Session } from '../api';
 import EmployeePicker, { type EmpLite } from '../components/EmployeePicker';
 import { Badge, Card, Empty, ErrorBox } from '../components/ui';
 import { money } from './Salary';
@@ -61,6 +61,7 @@ export default function Payroll({ companyId, session }: { companyId: string; ses
     catch (x) { setErr(x instanceof Error ? x.message : 'Failed'); }
     finally { setBusy(false); }
   };
+  const dl = async (path: string) => { setBusy(true); setErr(''); try { await download(path); } catch (x) { setErr(x instanceof Error ? x.message : 'Download failed'); } finally { setBusy(false); } };
   const create = () => act('runs', { year, month });
   const approve = async () => {
     setBusy(true); setErr('');
@@ -109,6 +110,7 @@ export default function Payroll({ companyId, session }: { companyId: string; ses
               {STEPS.map((s) => <li key={s} className={`px-2 py-1 rounded ${s === st ? 'bg-slate-900 text-white' : STEPS.indexOf(s) < STEPS.indexOf(st ?? '') ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{s}</li>)}
             </ol>
             <div className="ml-auto flex flex-wrap gap-2">
+              {can('reports.export') && (run._count?.details ?? 0) > 0 && <button disabled={busy} onClick={() => dl(`/companies/${companyId}/payslips/${run.id}`)} className={`${btn} border bg-white`}>Payslips (PDF)</button>}
               {can('payroll.process') && (st === 'DRAFT' || st === 'CALCULATED' || st === 'REVIEW') && <button disabled={busy} onClick={() => act(`runs/${run.id}/process`)} className={`${btn} ${st === 'DRAFT' ? 'bg-slate-900 text-white' : 'border bg-white'}`}>{st === 'DRAFT' ? 'Calculate payroll' : 'Recalculate'}</button>}
               {can('payroll.process') && st === 'CALCULATED' && <button disabled={busy} onClick={() => act(`runs/${run.id}/review`)} className={`${btn} bg-slate-900 text-white`}>Send to review</button>}
               {can('payroll.process') && st === 'REVIEW' && <button disabled={busy} onClick={() => act(`runs/${run.id}/back-to-calculated`)} className={`${btn} border bg-white`}>Back to calculated</button>}
@@ -179,7 +181,7 @@ export default function Payroll({ companyId, session }: { companyId: string; ses
         </>
       )}
 
-      {run && drawer && <DetailDrawer companyId={companyId} runId={run.id} employeeId={drawer} onClose={() => setDrawer(null)} />}
+      {run && drawer && <DetailDrawer companyId={companyId} runId={run.id} employeeId={drawer} canPdf={can('reports.export')} onClose={() => setDrawer(null)} />}
     </div>
   );
 }
@@ -231,7 +233,7 @@ function Inputs({ companyId, year, month, canEdit, onChanged }: { companyId: str
   );
 }
 
-function DetailDrawer({ companyId, runId, employeeId, onClose }: { companyId: string; runId: string; employeeId: string; onClose: () => void }) {
+function DetailDrawer({ companyId, runId, employeeId, canPdf, onClose }: { companyId: string; runId: string; employeeId: string; canPdf: boolean; onClose: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => { api<Detail>(`/companies/${companyId}/payroll/runs/${runId}/details/${employeeId}`).then(setD).catch((e) => setErr(e.message)); }, [companyId, runId, employeeId]);
@@ -252,6 +254,7 @@ function DetailDrawer({ companyId, runId, employeeId, onClose }: { companyId: st
               <div className="flex justify-between px-3 py-1.5 font-medium border-b"><span>Total deductions</span><span>{num(d.totalDeductions)}</span></div>
               <div className="flex justify-between px-3 py-2 font-semibold bg-slate-50"><span>Net pay</span><span>{num(d.net)}</span></div>
             </div>
+            {canPdf && <button onClick={() => download(`/companies/${companyId}/payslips/${runId}?employeeId=${employeeId}`).catch((x) => setErr(x.message))} className="border rounded-md px-3 py-1.5 text-sm">Download payslip (PDF)</button>}
             {d.warnings?.length ? <div className="text-xs bg-amber-50 text-amber-800 rounded p-3 space-y-1">{d.warnings.map((w) => <div key={w}>{w}</div>)}</div> : null}
             <details className="text-xs">
               <summary className="cursor-pointer text-slate-600">Calculation trace · engine v{d.formulaVersion}</summary>

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsIn, IsOptional, IsString, Length, Max, Min, Matches } from 'class-validator';
+import { IsBoolean, IsInt, IsIn, IsOptional, IsString, Length, Max, Min, Matches, ValidateNested } from 'class-validator';
 import { Request } from 'express';
 import { CurrentUser, RequirePermissions } from '../common/decorators';
 import { AuthUser } from '../common/auth.types';
@@ -53,6 +53,12 @@ class UpdateCompanyDto {
   @IsOptional() @IsIn(['ACTIVE', 'INACTIVE', 'SUSPENDED']) status?: any;
 }
 
+class BrandingDto {
+  @IsOptional() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'primaryColor must be a hex colour like #1e293b' }) primaryColor?: string;
+  @IsOptional() @IsString() @Length(0, 200) footerText?: string;
+  @IsOptional() @IsString() @Length(0, 40) title?: string;
+}
+
 /** Whitelisted settings; shiftEnabled defaults to false in the schema. */
 class SettingsDto {
   @IsOptional() @IsString() payrollFrequency?: string;
@@ -72,6 +78,7 @@ class SettingsDto {
   @IsOptional() @IsBoolean() bonusEnabled?: boolean;
   @IsOptional() @IsBoolean() gratuityEnabled?: boolean;
   @IsOptional() @IsBoolean() minimumWageEnabled?: boolean;
+  @IsOptional() @ValidateNested() @Type(() => BrandingDto) branding?: BrandingDto;
 }
 
 @ApiTags('Companies')
@@ -110,6 +117,6 @@ export class CompaniesController {
   @UseGuards(CompanyAccessGuard)
   @RequirePermissions('settings.manage')
   settings(@CurrentUser() u: AuthUser, @Param('companyId') id: string, @Body() d: SettingsDto, @Req() r: Request) {
-    return this.svc.updateSettings(u, id, d, r.ip);
+    return this.svc.updateSettings(u, id, { ...d, branding: d.branding ? { ...d.branding } : undefined }, r.ip);
   }
 }

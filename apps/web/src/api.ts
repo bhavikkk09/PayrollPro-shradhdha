@@ -23,7 +23,8 @@ async function raw(path: string, init: RequestInit, token?: string) {
   });
 }
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** fetch with the access token; on 401 tries one refresh, then signs out. */
+async function authed(path: string, init: RequestInit = {}): Promise<Response> {
   let s = getSession();
   let res = await raw(path, init, s?.accessToken);
   if (res.status === 401 && s) {
@@ -31,12 +32,30 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (r.ok) { s = await r.json(); setSession(s); res = await raw(path, init, s!.accessToken); }
     else { setSession(null); location.reload(); }
   }
-  if (!res.ok) {
-    const b = await res.json().catch(() => ({}));
-    const msg = Array.isArray(b.message) ? b.message.join(', ') : b.message ?? 'Request failed';
-    throw new ApiError(b.errorId ? `${msg} (ref ${b.errorId})` : msg, res.status, b.errorId);
-  }
+  return res;
+}
+
+async function fail(res: Response): Promise<never> {
+  const b = await res.json().catch(() => ({}));
+  const msg = Array.isArray(b.message) ? b.message.join(', ') : b.message ?? 'Request failed';
+  throw new ApiError(b.errorId ? `${msg} (ref ${b.errorId})` : msg, res.status, b.errorId);
+}
+
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await authed(path, init);
+  if (!res.ok) await fail(res);
   return res.json();
+}
+
+/** Downloads a file response (PDF, Excel, CSV) through the authenticated API. */
+export async function download(path: string) {
+  const res = await authed(path, { headers: { Accept: '*/*' } });
+  if (!res.ok) await fail(res);
+  const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'download';
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export const login = async (email: string, password: string) => {
