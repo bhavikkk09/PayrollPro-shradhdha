@@ -15,4 +15,4 @@ Docker: `JWT_SECRET=... docker compose up --build` (adds Postgres, Redis, daily 
 
 ## Status
 Phase 1 done: auth, RBAC, company master + settings (shift OFF by default), dashboard, audit log, tenant isolation tests.
-Phase 2 done: org masters + employee master. Phase 3 done: salary components, structures, employee salary. Re-run `npm run db:seed` to pick up new permissions. Phases 4-10 next.
+Phases 1-4 done (auth/RBAC/company, employees, salary, attendance/leave/shift). No new DB migration in phase 4. Phases 5-10 next.

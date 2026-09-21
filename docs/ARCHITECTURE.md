@@ -47,7 +47,8 @@ Bank account, PAN, Aadhaar reference use `*Enc` columns (application-level AES-G
 | 1 Setup, auth, RBAC, dashboard, company master | API done (auth, companies, settings, dashboard); UI in `apps/web` |
 | 2 Branch, Department, Designation, Location, Employee Master | Done (API + UI, encrypted bank/PAN/Aadhaar, masked by default, reveal is permission-gated and audited) |
 | 3 Salary components, structures, employee salary | Done (safe formula engine, pure calculator, effective-dated salary with stored snapshot) |
-| 4-10 | Schema and migration ready; modules to be built phase by phase |
+| 4 Attendance, Leave, optional Shift | Done (month grid, validated import with preview/confirm, finalize/reopen lock, leave ledger + accrual + requests + encashment, shift behind a per-company flag) |
+| 5-10 | Schema and migration ready; modules to be built phase by phase |
 
 ## ERD
 ```mermaid
@@ -85,3 +86,10 @@ erDiagram
 
 ## Salary formulas (Phase 3)
 Formulas are data, evaluated by a small parser (`salary/formula.ts`), never `eval`. Allowed: numbers, `+ - * /`, parentheses, component codes, `GROSS`, `MIN MAX ROUND FLOOR CEIL`. A structure runs items in sequence order; a formula may use only `GROSS` and earlier components. `calculateSalary()` is pure and deterministic and rounds every line to 2 decimals. Saving a structure dry-runs it, so broken formulas are rejected up front. Assigning salary stores the computed breakup as a snapshot on `employee_salary` and closes the previous record the day before, so later rule edits never change recorded salary or past payroll.
+
+## Attendance, leave, shift (Phase 4)
+* `attendance/attendance-summary.ts` is a pure month summariser. Weekly offs and holidays auto-fill; other unmarked days are reported, never guessed. LOP days = absent + unpaid leave + LOP + 0.5 per half day (0 when LOP is disabled). Paid days follow the company method (calendar / fixed 30 / working days) and mid-month joiners or leavers are paid only for employed days. `salaryDivisor` is exposed for the payroll engine.
+* Import flow: file parsed in the browser -> `import/validate` stores an `import_jobs` row with errors + staged valid rows -> user reviews -> `import/:id/confirm` writes. Nothing is inserted before confirmation; months that are finalized or have approved/locked payroll are refused at both steps.
+* Finalize writes `attendance_summary` (finalized=true) and locks edits. Reopen is blocked while payroll for that month is approved/locked.
+* Leave balances are a ledger (`leave_transactions`) with a cached `leave_balances`, updated in one transaction. Accrual is idempotent per month. Approval checks balance, deducts, and writes PAID/UNPAID_LEAVE attendance (source `LEAVE`); cancelling reverses both. One policy per leave type applies to all employees of the company.
+* Shift routes return 403 unless `company_settings.shiftEnabled`; the UI hides the menu. Attendance never needs a shift.

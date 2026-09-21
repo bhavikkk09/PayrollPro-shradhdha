@@ -4,6 +4,11 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuditModule } from './audit/audit.service';
+import { AttendanceController } from './attendance/attendance.controller';
+import { AttendanceService } from './attendance/attendance.service';
+import { LeaveController } from './leave/leave.controller';
+import { LeaveService } from './leave/leave.service';
+import { ShiftController } from './shift/shift.controller';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { CompanyAccessGuard, CompanyAccessService } from './common/company-access';
@@ -34,9 +39,9 @@ import { PrismaModule } from './prisma/prisma.service';
     PrismaModule,
     AuditModule,
   ],
-  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController],
+  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController, AttendanceController, LeaveController, ShiftController],
   providers: [
-    AuthService, CompaniesService, EmployeesService, SalaryService, CompanyAccessService, CompanyAccessGuard,
+    AuthService, CompaniesService, EmployeesService, SalaryService, AttendanceService, LeaveService, CompanyAccessService, CompanyAccessGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
