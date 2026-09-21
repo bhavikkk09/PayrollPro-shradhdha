@@ -274,6 +274,7 @@ model Company {
   leaveTypes      LeaveType[]
   leavePolicies   LeavePolicy[]
   loans           Loan[]
+  payrollInputs   PayrollInput[]
   payrollRuns     PayrollRun[]
   complianceTasks ComplianceTask[]
   documents       Document[]
@@ -464,6 +465,7 @@ model Employee {
   leaveTxns     LeaveTransaction[]
   leaveRequests LeaveRequest[]
   loans         Loan[]
+  payrollInputs PayrollInput[]
   payrollDetails PayrollDetail[]
 
   @@unique([companyId, code])
@@ -766,6 +768,7 @@ model PayrollRun {
   approvedAt  DateTime?
   lockedBy    String?
   lockedAt    DateTime?
+  issues      Json?          // per-employee errors/warnings from the last calculation
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -775,6 +778,27 @@ model PayrollRun {
 
   @@unique([companyId, year, month, type])
   @@index([companyId, status])
+}
+
+// One-time earnings/deductions for a month (arrears, bonus, incentive, other). Loans use the loans tables.
+model PayrollInput {
+  id         String   @id @default(uuid())
+  companyId  String
+  employeeId String
+  year       Int
+  month      Int
+  kind       String   // ARREAR | BONUS | INCENTIVE | OTHER_EARNING | OTHER_DEDUCTION
+  name       String
+  amount     Decimal  @db.Decimal(14, 2)
+  note       String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, year, month])
+  @@index([employeeId, year, month])
 }
 
 model PayrollDetail {

@@ -10,9 +10,14 @@ export interface CalcItem {
   fixedAmount?: number | null;
   formula?: string | null;
   sequence: number;
+  flags?: LineFlags; // statutory applicability, copied from the component
 }
 
-export interface CalcLine { code: string; name: string; type: CalcItem['type']; amount: number; method: string }
+export interface LineFlags { pf: boolean; esi: boolean; pt: boolean; bonus: boolean; gratuity: boolean; taxable: boolean }
+/** HOURLY components (overtime): amount = otHours x (base / divisor / hoursPerDay) x multiplier, computed at payroll time. */
+export interface HourlyParams { percentOf: string; multiplier: number; hoursPerDay: number }
+
+export interface CalcLine { code: string; name: string; type: CalcItem['type']; amount: number; method: string; flags?: LineFlags; hourly?: HourlyParams }
 export interface CalcResult {
   lines: CalcLine[];
   gross: number; // sum of EARNING lines
@@ -65,7 +70,10 @@ export function calculateSalary(targetGross: number, items: CalcItem[], override
     if (!Number.isFinite(amount)) throw new FormulaError(`${it.code}: result is not a number`);
     if (amount < 0) warnings.push(`${it.code} is negative (${amount})`);
     vars[it.code] = amount;
-    lines.push({ code: it.code, name: it.name, type: it.type, amount, method: it.calcMethod });
+    lines.push({
+      code: it.code, name: it.name, type: it.type, amount, method: it.calcMethod, flags: it.flags,
+      ...(it.calcMethod === 'HOURLY' ? { hourly: { percentOf: (it.percentOf ?? 'GROSS').toUpperCase(), multiplier: it.percentage ?? 1, hoursPerDay: it.fixedAmount ?? 8 } } : {}),
+    });
   }
 
   const gross = round2(lines.filter((l) => l.type === 'EARNING').reduce((s, l) => s + l.amount, 0));

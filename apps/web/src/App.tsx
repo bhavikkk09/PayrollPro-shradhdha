@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, LogOut, Users, Network, Coins, CalendarCheck, CalendarOff, Clock, Wallet, ShieldCheck, FileText, Menu } from 'lucide-react';
+import { Building2, LayoutDashboard, LogOut, Users, Network, Coins, CalendarCheck, CalendarOff, Clock, Wallet, Layers, ShieldCheck, FileText, Menu } from 'lucide-react';
 import { api, getSession, setSession, type Session } from './api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
+import Payroll from './pages/Payroll';
+import BulkPayroll from './pages/BulkPayroll';
 import Attendance from './pages/Attendance';
 import Leave from './pages/Leave';
 import Shifts from './pages/Shifts';
@@ -11,7 +13,7 @@ import Salary from './pages/Salary';
 import Organisation from './pages/Organisation';
 import Companies, { type Company } from './pages/Companies';
 
-type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts';
+type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts' | 'payroll' | 'bulk';
 
 const NAV: { key: Page | 'soon'; label: string; icon: typeof Users; soon?: boolean }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -22,7 +24,8 @@ const NAV: { key: Page | 'soon'; label: string; icon: typeof Users; soon?: boole
   { key: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { key: 'leave', label: 'Leave', icon: CalendarOff },
   { key: 'shifts', label: 'Shifts', icon: Clock },
-  { key: 'soon', label: 'Payroll', icon: Wallet, soon: true },
+  { key: 'payroll', label: 'Payroll', icon: Wallet },
+  { key: 'bulk', label: 'Bulk payroll', icon: Layers },
   { key: 'soon', label: 'Compliance', icon: ShieldCheck, soon: true },
   { key: 'soon', label: 'Reports', icon: FileText, soon: true },
 ];
@@ -96,10 +99,12 @@ export default function App() {
         <main className="p-4 md:p-6">
           {page === 'dashboard' && <Dashboard companyId={companyId} />}
           {page === 'companies' && <Companies session={session} />}
-          {page !== 'dashboard' && page !== 'companies' && (companyId === 'ALL'
+          {page === 'bulk' && <BulkPayroll companies={companies} session={session} />}
+          {page !== 'dashboard' && page !== 'companies' && page !== 'bulk' && (companyId === 'ALL'
             ? <div className="text-sm text-slate-600 bg-white border rounded-xl p-6">Select a company from the top bar to continue.</div>
             : page === 'salary' ? <Salary key={companyId} companyId={companyId} session={session} />
             : page === 'employees' ? <Employees key={companyId} companyId={companyId} session={session} />
+            : page === 'payroll' ? <Payroll key={companyId} companyId={companyId} session={session} />
             : page === 'attendance' ? <Attendance key={companyId} companyId={companyId} session={session} />
             : page === 'leave' ? <Leave key={companyId} companyId={companyId} session={session} />
             : page === 'shifts' ? (shiftEnabled ? <Shifts key={companyId} companyId={companyId} session={session} /> : <div className="text-sm text-slate-600">Shift management is disabled for this company.</div>)

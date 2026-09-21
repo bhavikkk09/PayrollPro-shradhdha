@@ -43,6 +43,16 @@ export const dateKey = (y: number, m: number, d: number) => `${y}-${String(m).pa
 export const weekday = (key: string) => DOW[new Date(`${key}T00:00:00Z`).getUTCDay()];
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/** Days the monthly salary is divided by, per the company method. Shared by attendance close and the payroll engine. */
+export function monthSalaryDivisor(method: CalcMethod, year: number, month: number, weeklyOff: string[], holidays: Set<string>): number {
+  const n = daysInMonth(year, month);
+  if (method === 'FIXED_30') return 30;
+  if (method !== 'WORKING_DAYS') return n;
+  let w = 0;
+  for (let d = 1; d <= n; d++) { const k = dateKey(year, month, d); if (!weeklyOff.includes(weekday(k)) && !holidays.has(k)) w++; }
+  return w;
+}
+
 /**
  * LOP rule: when LOP is enabled, lopDays = absent + unpaid leave + days marked LOP + 0.5 per half day.
  * When LOP is disabled no deduction days are produced (everyone is paid in full).

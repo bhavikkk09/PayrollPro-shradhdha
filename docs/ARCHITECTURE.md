@@ -48,7 +48,8 @@ Bank account, PAN, Aadhaar reference use `*Enc` columns (application-level AES-G
 | 2 Branch, Department, Designation, Location, Employee Master | Done (API + UI, encrypted bank/PAN/Aadhaar, masked by default, reveal is permission-gated and audited) |
 | 3 Salary components, structures, employee salary | Done (safe formula engine, pure calculator, effective-dated salary with stored snapshot) |
 | 4 Attendance, Leave, optional Shift | Done (month grid, validated import with preview/confirm, finalize/reopen lock, leave ledger + accrual + requests + encashment, shift behind a per-company flag) |
-| 5-10 | Schema and migration ready; modules to be built phase by phase |
+| 5 Payroll Engine | Done (pure engine v1.0.0, rule-driven PF/ESI/PT/LWF, OT, arrears/bonus, loans, run workflow DRAFT..LOCKED, unlock audit, bulk payroll). F&F settlement and automatic TDS are not built yet |
+| 6-10 | Schema and migration ready; modules to be built phase by phase |
 
 ## ERD
 ```mermaid
@@ -93,3 +94,12 @@ Formulas are data, evaluated by a small parser (`salary/formula.ts`), never `eva
 * Finalize writes `attendance_summary` (finalized=true) and locks edits. Reopen is blocked while payroll for that month is approved/locked.
 * Leave balances are a ledger (`leave_transactions`) with a cached `leave_balances`, updated in one transaction. Accrual is idempotent per month. Approval checks balance, deducts, and writes PAID/UNPAID_LEAVE attendance (source `LEAVE`); cancelling reverses both. One policy per leave type applies to all employees of the company.
 * Shift routes return 403 unless `company_settings.shiftEnabled`; the UI hides the menu. Attendance never needs a shift.
+
+## Payroll engine (Phase 5)
+* `payroll/payroll-engine.ts` is one pure function per employee: no DB, no clock. Steps: attendance ratio (paid days / salary divisor) -> prorated earnings from the stored salary snapshot -> overtime (HOURLY components: otHours x base/divisor/hoursPerDay x multiplier) -> one-time earnings -> fixed and one-time deductions, loans -> statutory from rules -> totals. Each step is recorded in a trace.
+* Statutory (`payroll/statutory.ts`) reads versioned `compliance_rules` only: PF (percent, wage ceiling), ESI (ceiling, rounding), PT (slabs with month overrides), LWF (fixed amounts in listed months). Rule choice: state-specific beats central, then latest effective date, then highest version. An enabled module with no rule produces a warning, never a silent zero.
+* Reproducibility: each `payroll_details` row stores the exact `inputs`, the `calculation` trace, `formulaVersion`, and the run keeps a `rulesSnapshot` of the rules used. Later changes to salary or rules do not alter an existing run; only an explicit recalculation (before approval) does.
+* Workflow: DRAFT -> (Calculate) CALCULATED -> REVIEW -> APPROVED -> LOCKED. Approve needs `payroll.approve`, lock needs `payroll.lock`, unlock needs `payroll.unlock` plus a written reason and always writes an audit entry. Approved or locked runs cannot be recalculated, and attendance and inputs for that month are frozen. Loan balances are reduced at approval and restored if approval is reversed.
+* Employees that cannot be calculated (no salary, attendance not finalized) are listed as ERROR issues and skipped; approval is refused until they are fixed or explicitly acknowledged.
+* Bulk payroll runs each company independently (own transactions, try/catch per company) and reports Employees / Success / Errors / Warnings / Status. It currently runs in-process after the request returns; the queue-based worker arrives with deployment hardening.
+* Known limits: a salary revised mid-month applies the latest rate to the whole month (warned); PF/ESI wages exclude one-time arrears; no F&F settlement and no automatic TDS yet (enter TDS as an "Other deduction").
