@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lcp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lcp}
+      POSTGRES_DB: lcp
+    volumes: [pgdata:/var/lib/postgresql/data]
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lcp"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql://lcp:${DB_PASSWORD:-lcp}@db:5432/lcp?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ chars)}
+      CORS_ORIGINS: http://localhost:5173
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["3000:3000"]
+
+  # Daily logical backup with retention; ship /backups to object storage in production.
+  backup:
+    image: postgres:16-alpine
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGPASSWORD: ${DB_PASSWORD:-lcp}
+      RETENTION_DAYS: 14
+    volumes: [./backups:/backups]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          f=/backups/lcp_$$(date +%Y%m%d_%H%M%S).sql.gz
+          pg_dump -h db -U lcp lcp | gzip > $$f && gzip -t $$f && echo "backup ok $$f"
+          find /backups -name 'lcp_*.sql.gz' -mtime +$$RETENTION_DAYS -delete
+          sleep 86400
+        done
+
+volumes:
+  pgdata:

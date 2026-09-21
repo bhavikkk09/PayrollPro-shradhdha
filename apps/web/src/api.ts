@@ -1,0 +1,48 @@
+export interface Session {
+  accessToken: string;
+  refreshToken: string;
+  user: { id: string; name: string; email: string; type: string; roles: string[]; permissions: string[] };
+}
+
+const KEY = 'lcp.session';
+export const getSession = (): Session | null => {
+  try { return JSON.parse(localStorage.getItem(KEY) ?? 'null'); } catch { return null; }
+};
+export const setSession = (s: Session | null) => {
+  try { s ? localStorage.setItem(KEY, JSON.stringify(s)) : localStorage.removeItem(KEY); } catch { /* storage blocked */ }
+};
+
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public errorId?: string) { super(message); }
+}
+
+async function raw(path: string, init: RequestInit, token?: string) {
+  return fetch(`/api/v1${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
+  });
+}
+
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  let s = getSession();
+  let res = await raw(path, init, s?.accessToken);
+  if (res.status === 401 && s) {
+    const r = await raw('/auth/refresh', { method: 'POST', body: JSON.stringify({ refreshToken: s.refreshToken }) });
+    if (r.ok) { s = await r.json(); setSession(s); res = await raw(path, init, s!.accessToken); }
+    else { setSession(null); location.reload(); }
+  }
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({}));
+    const msg = Array.isArray(b.message) ? b.message.join(', ') : b.message ?? 'Request failed';
+    throw new ApiError(b.errorId ? `${msg} (ref ${b.errorId})` : msg, res.status, b.errorId);
+  }
+  return res.json();
+}
+
+export const login = async (email: string, password: string) => {
+  const res = await raw('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  const b = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(b.message ?? 'Login failed', res.status);
+  setSession(b);
+  return b as Session;
+};

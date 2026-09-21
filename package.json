@@ -1,0 +1,11 @@
+{
+  "name": "labour-consult-pro",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "api": "npm run start:dev -w @lcp/api",
+    "web": "npm run dev -w @lcp/web",
+    "db:migrate": "npm run prisma:migrate -w @lcp/api",
+    "db:seed": "npm run seed -w @lcp/api"
+  }
+}
