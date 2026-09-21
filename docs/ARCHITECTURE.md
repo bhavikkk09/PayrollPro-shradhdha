@@ -49,7 +49,8 @@ Bank account, PAN, Aadhaar reference use `*Enc` columns (application-level AES-G
 | 3 Salary components, structures, employee salary | Done (safe formula engine, pure calculator, effective-dated salary with stored snapshot) |
 | 4 Attendance, Leave, optional Shift | Done (month grid, validated import with preview/confirm, finalize/reopen lock, leave ledger + accrual + requests + encashment, shift behind a per-company flag) |
 | 5 Payroll Engine | Done (pure engine v1.0.0, rule-driven PF/ESI/PT/LWF, OT, arrears/bonus, loans, run workflow DRAFT..LOCKED, unlock audit, bulk payroll). F&F settlement and automatic TDS are not built yet |
-| 6-10 | Schema and migration ready; modules to be built phase by phase |
+| 6 Compliance framework | Done (versioned rule master with tenant-safe ownership, rule validation, calc preview, automatic TDS, registrations, central compliance calendar with statuses, period summaries) |
+| 7-10 | Schema and migration ready; modules to be built phase by phase |
 
 ## ERD
 ```mermaid
@@ -103,3 +104,10 @@ Formulas are data, evaluated by a small parser (`salary/formula.ts`), never `eva
 * Employees that cannot be calculated (no salary, attendance not finalized) are listed as ERROR issues and skipped; approval is refused until they are fixed or explicitly acknowledged.
 * Bulk payroll runs each company independently (own transactions, try/catch per company) and reports Employees / Success / Errors / Warnings / Status. It currently runs in-process after the request returns; the queue-based worker arrives with deployment hardening.
 * Known limits: a salary revised mid-month applies the latest rate to the whole month (warned); PF/ESI wages exclude one-time arrears; no F&F settlement and no automatic TDS yet (enter TDS as an "Other deduction").
+
+## Compliance framework (Phase 6)
+* Rule ownership: `compliance_rules.consultantId` is null for platform defaults (maintained by super admins) or set for one consultant's own overrides. A consultant can never read or change another consultant's rules, and a consultant-owned rule beats the platform rule when both are in force (`pickRule`: state-specific, then own, then latest effective date, then version).
+* Rules are immutable and versioned. Creating a version validates its shape (`rule-validate.ts`), requires an effective date after the current version, and closes the previous version the day before. Every creation is audited. `POST /compliance/calc-preview` tries a rule on a hypothetical wage without touching payroll.
+* TDS is rule-driven: slabs, standard deduction, rebate, cess and financial-year start all come from the rule. Monthly TDS = (annual tax on projected taxable income - TDS already deducted this FY) / months left. Projection = YTD from approved runs + this month's taxable earnings x months left. Simplified: no investment declarations or HRA exemption; prior-month taxable is approximated by gross.
+* Calendar: tasks are generated from enabled company modules using `dueDay`/`dueMonthOffset`/`months` stored on the rule (nothing hard-coded). Statuses UPCOMING/DUE_SOON/PENDING/OVERDUE are derived from dates (`computeStatus`) and persisted on read; COMPLETED is manual. Completing a PF/ESI/PT/LWF/TDS filing requires that period's payroll to be APPROVED or LOCKED. The dashboard refreshes statuses before counting.
+* Task actions (assign/complete/reopen) resolve the task's company through the same access check as everything else, so another tenant's task looks like it does not exist.

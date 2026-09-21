@@ -2,7 +2,7 @@
 // No database, no clock, no randomness. Same input always yields the same output, and every step is traced,
 // so any historical payslip can be reproduced from the stored `inputs` and re-verified.
 import { HourlyParams, LineFlags } from '../salary/salary-calculator';
-import { calcESI, calcLWF, calcPF, calcPT, Module, pickRule, StatRule } from './statutory';
+import { calcESI, calcLWF, calcPF, calcPT, calcTDS, Module, pickRule, StatRule } from './statutory';
 
 export const ENGINE_VERSION = '1.0.0';
 
@@ -25,6 +25,8 @@ export interface EmployeeInput {
   state: string | null; // for state-specific rules (PT, LWF, ...)
   applicable: { pf: boolean; esi: boolean; pt: boolean; lwf: boolean };
   tdsEnabled: boolean;
+  /** Year-to-date figures for TDS projection (prior approved months of the same financial year). */
+  tds?: { ytdTaxable: number; ytdTds: number; monthsRemaining: number };
 }
 export interface EngineConfig {
   rounding: 'NEAREST_RUPEE' | 'NONE';
@@ -36,7 +38,7 @@ export interface EarningLine { code: string; name: string; amount: number; month
 export interface DeductionLine { code: string; name: string; amount: number; employer?: number; source: 'SALARY' | 'STATUTORY' | 'LOAN' | 'ADJUSTMENT'; loanId?: string; ruleId?: string; ruleVersion?: number }
 export interface PayrollOutput {
   earnings: EarningLine[]; deductions: DeductionLine[];
-  gross: number; totalDeductions: number; net: number; employerContribution: number;
+  gross: number; totalDeductions: number; net: number; employerContribution: number; taxable: number;
   paidDays: number; lopDays: number; otHours: number; ratio: number;
   warnings: string[]; errors: string[];
   trace: { step: string; detail: unknown }[];
@@ -49,7 +51,7 @@ export function calculateEmployeePayroll(i: EmployeeInput, cfg: EngineConfig): P
   const errors: string[] = [];
   const trace: PayrollOutput['trace'] = [];
   const money = (n: number) => (cfg.rounding === 'NEAREST_RUPEE' ? Math.round(n + Number.EPSILON) : r2(n));
-  const empty = (): PayrollOutput => ({ earnings: [], deductions: [], gross: 0, totalDeductions: 0, net: 0, employerContribution: 0, paidDays: 0, lopDays: 0, otHours: 0, ratio: 0, warnings, errors, trace });
+  const empty = (): PayrollOutput => ({ earnings: [], deductions: [], gross: 0, totalDeductions: 0, net: 0, employerContribution: 0, taxable: 0, paidDays: 0, lopDays: 0, otHours: 0, ratio: 0, warnings, errors, trace });
 
   // 1. Attendance -> proration ratio
   const divisor = i.attendance?.salaryDivisor ?? i.daysInMonth;
@@ -121,14 +123,19 @@ export function calculateEmployeePayroll(i: EmployeeInput, cfg: EngineConfig): P
   stat('ESI', i.applicable.esi, (rule) => calcESI(esiWage, rule), esiWage);
   stat('PT', i.applicable.pt, (rule) => calcPT(ptWage, i.month, rule), ptWage);
   stat('LWF', i.applicable.lwf, (rule) => calcLWF(i.month, rule), 0);
-  if (i.tdsEnabled) warnings.push('TDS is enabled but automatic TDS is not configured; enter it as an "Other deduction" input');
+  // TDS: taxable earnings this month + projection of the rest of the financial year
+  const taxable = r2(earnings.reduce((sum, e) => sum + (e.source === 'SALARY' ? (flagsByCode.get(e.code)?.taxable ? e.amount : 0) : e.amount), 0));
+  if (i.tdsEnabled) {
+    const t = i.tds ?? { ytdTaxable: 0, ytdTds: 0, monthsRemaining: 1 };
+    stat('TDS', true, (rule) => calcTDS({ annualTaxable: t.ytdTaxable + taxable * t.monthsRemaining, tdsYtd: t.ytdTds, monthsRemaining: t.monthsRemaining }, rule), taxable);
+  }
 
   // 7. Totals
   const totalDeductions = r2(deductions.reduce((s, d) => s + d.amount, 0));
   const net = money(gross - totalDeductions);
   const employerContribution = r2(deductions.reduce((s, d) => s + (d.employer ?? 0), 0));
   if (net < 0) warnings.push(`Net salary is negative (${net})`);
-  trace.push({ step: 'totals', detail: { gross, totalDeductions, net, employerContribution } });
+  trace.push({ step: 'totals', detail: { gross, totalDeductions, net, employerContribution, taxable } });
 
-  return { earnings, deductions, gross, totalDeductions, net, employerContribution, paidDays, lopDays, otHours, ratio, warnings, errors, trace };
+  return { earnings, deductions, gross, totalDeductions, net, employerContribution, taxable, paidDays, lopDays, otHours, ratio, warnings, errors, trace };
 }

@@ -15,6 +15,7 @@ export interface StatRule {
   employeePercent: number | null;
   employerPercent: number | null;
   slabs: unknown; // PT: [{from, to|null, amount, monthAmounts?: {"2": 300}}]
+  own?: boolean; // true when the rule belongs to the company's consultant (beats a platform default)
   rules: Record<string, any> | null; // e.g. {rounding:'UP', capWages:true, months:[6,12], employeeAmount, employerAmount}
 }
 
@@ -22,10 +23,11 @@ export interface StatResult { employee: number; employer: number; wage: number; 
 
 const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 
-/** Rule in force on `onDate` for a module: state-specific beats central; then latest effectiveFrom, then highest version. */
+/** Rule in force on `onDate`: state-specific beats central; consultant-owned beats platform; then latest effectiveFrom, then highest version. */
 export function pickRule(rules: StatRule[], module: Module, state: string | null, onDate: string): StatRule | null {
   const live = rules.filter((r) => r.module === module && r.effectiveFrom <= onDate && (!r.effectiveTo || r.effectiveTo >= onDate));
-  const order = (a: StatRule, b: StatRule) => (a.effectiveFrom === b.effectiveFrom ? b.version - a.version : a.effectiveFrom < b.effectiveFrom ? 1 : -1);
+  const order = (a: StatRule, b: StatRule) =>
+    Number(!!b.own) - Number(!!a.own) || (a.effectiveFrom === b.effectiveFrom ? b.version - a.version : a.effectiveFrom < b.effectiveFrom ? 1 : -1);
   const exact = live.filter((r) => r.state && norm(r.state) === norm(state)).sort(order);
   if (exact.length) return exact[0];
   return live.filter((r) => !r.state).sort(order)[0] ?? null;
@@ -79,4 +81,36 @@ export function calcLWF(month: number, rule: StatRule): StatResult {
     employer: due ? Number(rule.rules?.employerAmount ?? 0) : 0,
     wage: 0, ruleId: rule.id, ruleVersion: rule.version,
   };
+}
+
+interface TaxSlab { from: number; to: number | null; rate: number }
+
+/** Annual tax from progressive slabs (rate is a percentage of the part of income inside each band). */
+export function slabTax(income: number, slabs: TaxSlab[]): number {
+  let tax = 0;
+  for (const b of slabs) {
+    const top = b.to == null ? Infinity : b.to;
+    const part = Math.max(0, Math.min(income, top) - b.from);
+    tax += (part * b.rate) / 100;
+  }
+  return tax;
+}
+
+export interface TdsInput { annualTaxable: number; tdsYtd: number; monthsRemaining: number }
+
+/**
+ * Simplified monthly TDS: project the year, apply slabs (rule.slabs = [{from,to,rate}]), standard deduction,
+ * rebate {incomeLimit,maxAmount} and cess from the rule, then spread the tax not yet deducted over the
+ * remaining months. No investment declarations or HRA exemption are modelled.
+ */
+export function calcTDS(i: TdsInput, rule: StatRule): StatResult {
+  const r = rule.rules ?? {};
+  const slabs = (Array.isArray(rule.slabs) ? rule.slabs : []) as TaxSlab[];
+  const income = Math.max(0, i.annualTaxable - Number(r.standardDeduction ?? 0));
+  let tax = slabTax(income, slabs);
+  if (r.rebate && income <= Number(r.rebate.incomeLimit)) tax = Math.max(0, tax - Number(r.rebate.maxAmount));
+  tax += (tax * Number(r.cessPercent ?? 0)) / 100;
+  const remaining = Math.max(0, tax - i.tdsYtd);
+  const monthly = roundBy(remaining / Math.max(1, i.monthsRemaining), r.rounding);
+  return { employee: monthly, employer: 0, wage: income, ruleId: rule.id, ruleVersion: rule.version, note: undefined };
 }

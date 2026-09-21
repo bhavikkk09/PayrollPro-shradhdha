@@ -11,6 +11,8 @@ import { LeaveService } from './leave/leave.service';
 import { ShiftController } from './shift/shift.controller';
 import { BulkPayrollController, PayrollController } from './payroll/payroll.controller';
 import { PayrollService } from './payroll/payroll.service';
+import { ComplianceController, CompanyComplianceController } from './compliance/compliance.controller';
+import { ComplianceService } from './compliance/compliance.service';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { CompanyAccessGuard, CompanyAccessService } from './common/company-access';
@@ -41,9 +43,9 @@ import { PrismaModule } from './prisma/prisma.service';
     PrismaModule,
     AuditModule,
   ],
-  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController, AttendanceController, LeaveController, ShiftController, PayrollController, BulkPayrollController],
+  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController, AttendanceController, LeaveController, ShiftController, PayrollController, BulkPayrollController, ComplianceController, CompanyComplianceController],
   providers: [
-    AuthService, CompaniesService, EmployeesService, SalaryService, AttendanceService, LeaveService, PayrollService, CompanyAccessService, CompanyAccessGuard,
+    AuthService, CompaniesService, EmployeesService, SalaryService, AttendanceService, LeaveService, PayrollService, ComplianceService, CompanyAccessService, CompanyAccessGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

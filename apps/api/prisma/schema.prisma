@@ -137,6 +137,7 @@ model Consultant {
 
   companies Company[]
   users     User[]
+  complianceRules ComplianceRule[]
 }
 
 model User {
@@ -884,6 +885,7 @@ model BulkPayrollItem {
 // ───────────── Compliance (versioned rules) ─────────────
 model ComplianceRule {
   id             String           @id @default(uuid())
+  consultantId   String?          // null = platform default; set = this consultant's own override (never edited across tenants)
   module         ComplianceModule
   state          String?          // null = central / all states
   version        Int
@@ -900,8 +902,11 @@ model ComplianceRule {
   createdBy      String?
   createdAt      DateTime         @default(now())
 
-  @@unique([module, state, version])
+  consultant     Consultant?      @relation(fields: [consultantId], references: [id])
+
+  @@unique([consultantId, module, state, version])
   @@index([module, state, effectiveFrom])
+  @@index([consultantId])
 }
 
 model ComplianceTask {

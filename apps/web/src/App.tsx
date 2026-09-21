@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, LogOut, Users, Network, Coins, CalendarCheck, CalendarOff, Clock, Wallet, Layers, ShieldCheck, FileText, Menu } from 'lucide-react';
+import { Building2, LayoutDashboard, LogOut, Users, Network, Coins, CalendarCheck, CalendarOff, Clock, Wallet, Layers, Scale, ShieldCheck, FileText, Menu } from 'lucide-react';
 import { api, getSession, setSession, type Session } from './api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
+import Compliance from './pages/Compliance';
+import ComplianceRules from './pages/ComplianceRules';
 import Payroll from './pages/Payroll';
 import BulkPayroll from './pages/BulkPayroll';
 import Attendance from './pages/Attendance';
@@ -13,7 +15,7 @@ import Salary from './pages/Salary';
 import Organisation from './pages/Organisation';
 import Companies, { type Company } from './pages/Companies';
 
-type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts' | 'payroll' | 'bulk';
+type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts' | 'payroll' | 'bulk' | 'compliance' | 'rules';
 
 const NAV: { key: Page | 'soon'; label: string; icon: typeof Users; soon?: boolean }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -26,7 +28,8 @@ const NAV: { key: Page | 'soon'; label: string; icon: typeof Users; soon?: boole
   { key: 'shifts', label: 'Shifts', icon: Clock },
   { key: 'payroll', label: 'Payroll', icon: Wallet },
   { key: 'bulk', label: 'Bulk payroll', icon: Layers },
-  { key: 'soon', label: 'Compliance', icon: ShieldCheck, soon: true },
+  { key: 'compliance', label: 'Compliance', icon: ShieldCheck },
+  { key: 'rules', label: 'Compliance rules', icon: Scale },
   { key: 'soon', label: 'Reports', icon: FileText, soon: true },
 ];
 
@@ -99,8 +102,10 @@ export default function App() {
         <main className="p-4 md:p-6">
           {page === 'dashboard' && <Dashboard companyId={companyId} />}
           {page === 'companies' && <Companies session={session} />}
+          {page === 'compliance' && <Compliance key={companyId} companyId={companyId} session={session} />}
+          {page === 'rules' && <ComplianceRules session={session} />}
           {page === 'bulk' && <BulkPayroll companies={companies} session={session} />}
-          {page !== 'dashboard' && page !== 'companies' && page !== 'bulk' && (companyId === 'ALL'
+          {page !== 'dashboard' && page !== 'companies' && page !== 'bulk' && page !== 'compliance' && page !== 'rules' && (companyId === 'ALL'
             ? <div className="text-sm text-slate-600 bg-white border rounded-xl p-6">Select a company from the top bar to continue.</div>
             : page === 'salary' ? <Salary key={companyId} companyId={companyId} session={session} />
             : page === 'employees' ? <Employees key={companyId} companyId={companyId} session={session} />

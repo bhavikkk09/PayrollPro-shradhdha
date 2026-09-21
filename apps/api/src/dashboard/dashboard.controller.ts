@@ -3,18 +3,20 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, RequirePermissions } from '../common/decorators';
 import { AuthUser } from '../common/auth.types';
 import { CompanyAccessService } from '../common/company-access';
+import { ComplianceService } from '../compliance/compliance.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private prisma: PrismaService, private access: CompanyAccessService) {}
+  constructor(private prisma: PrismaService, private access: CompanyAccessService, private compliance: ComplianceService) {}
 
   @Get('summary')
   @RequirePermissions('dashboard.view')
   async summary(@CurrentUser() u: AuthUser) {
     const ids = await this.access.accessibleCompanyIds(u);
+    await this.compliance.refreshStatuses(ids); // keep OVERDUE/DUE_SOON current before counting
     const scope = ids === 'ALL' ? {} : { companyId: { in: ids } };
     const companyScope = ids === 'ALL' ? { deletedAt: null } : { deletedAt: null, id: { in: ids } };
     const now = new Date();

@@ -7,7 +7,11 @@ import { AuthUser } from '../common/auth.types';
 import { CompanyAccessService } from '../common/company-access';
 import { PrismaService } from '../prisma/prisma.service';
 import { Adjustment, calculateEmployeePayroll, EmployeeInput, ENGINE_VERSION, EngineConfig, SalaryLineSnap } from './payroll-engine';
-import { StatRule } from './statutory';
+import { pickRule, StatRule } from './statutory';
+
+/** Months from `month` to the end of the financial year, inclusive. FY starts in `fyStart` (default April). */
+export const monthsLeftInFy = (month: number, fyStart: number) => ((fyStart - 1 - month + 12) % 12) + 1;
+const fyStartOf = (rules: StatRule[], state: string | null, on: string) => Number(pickRule(rules, 'TDS', state, on)?.rules?.fyStartMonth ?? 4);
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const ymd = (s: string) => new Date(`${s}T00:00:00.000Z`);
@@ -98,7 +102,7 @@ export class PayrollService {
   private async calculate(u: AuthUser, companyId: string, runId: string, year: number, month: number) {
     const { start, end } = period(year, month);
     const [company, settings] = await Promise.all([
-      this.prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { state: true } }),
+      this.prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { state: true, consultantId: true } }),
       this.prisma.companySettings.findUnique({ where: { companyId } }),
     ]);
     const st = {
@@ -121,14 +125,15 @@ export class PayrollService {
       this.prisma.attendanceSummary.findMany({ where: { companyId, year, month, employeeId: { in: ids } } }),
       this.prisma.payrollInput.findMany({ where: { companyId, year, month, employeeId: { in: ids } } }),
       this.prisma.loan.findMany({ where: { companyId, employeeId: { in: ids }, status: 'ACTIVE', startMonth: { lte: ymd(end) }, balance: { gt: 0 } } }),
-      this.prisma.complianceRule.findMany({ where: { effectiveFrom: { lte: ymd(end) } } }),
+      this.prisma.complianceRule.findMany({ where: { effectiveFrom: { lte: ymd(end) }, OR: [{ consultantId: null }, { consultantId: company.consultantId }] } }),
     ]);
     const rules: StatRule[] = dbRules.map((r) => ({
       id: r.id, module: r.module, state: r.state, version: r.version, effectiveFrom: iso(r.effectiveFrom), effectiveTo: r.effectiveTo ? iso(r.effectiveTo) : null,
       wageCeiling: r.wageCeiling == null ? null : n(r.wageCeiling), threshold: r.threshold == null ? null : n(r.threshold),
       employeePercent: r.employeePercent == null ? null : n(r.employeePercent), employerPercent: r.employerPercent == null ? null : n(r.employerPercent),
-      slabs: r.slabs, rules: r.rules as Record<string, any> | null,
+      slabs: r.slabs, rules: r.rules as Record<string, any> | null, own: r.consultantId !== null,
     }));
+    const tdsYtd = st.tds ? await this.loadTdsYtd(companyId, ids, year, month, Number(pickRule(rules, 'TDS', company.state, end)?.rules?.fyStartMonth ?? 4)) : new Map<string, { ytdTaxable: number; ytdTds: number }>();
     const cfg: EngineConfig = { rounding: st.rounding, rules, asOf: end };
 
     const by = <T extends { employeeId: string }>(rows: T[]) => { const m = new Map<string, T[]>(); for (const r of rows) m.set(r.employeeId, [...(m.get(r.employeeId) ?? []), r]); return m; };
@@ -162,6 +167,7 @@ export class PayrollService {
         state: b?.state ?? company.state,
         applicable: { pf: st.pf && e.pfApplicable && (b?.pfApplicable ?? true), esi: st.esi && e.esiApplicable && (b?.esiApplicable ?? true), pt: st.pt && e.ptApplicable && (b?.ptApplicable ?? true), lwf: st.lwf && e.lwfApplicable && (b?.lwfApplicable ?? true) },
         tdsEnabled: st.tds,
+        tds: st.tds ? { ytdTaxable: tdsYtd.get(e.id)?.ytdTaxable ?? 0, ytdTds: tdsYtd.get(e.id)?.ytdTds ?? 0, monthsRemaining: monthsLeftInFy(month, fyStartOf(rules, company.state, end)) } : undefined,
       };
       const out = calculateEmployeePayroll(input, cfg);
       if (out.errors.length) { out.errors.forEach(fail); continue; }
@@ -171,7 +177,7 @@ export class PayrollService {
       detailRows.push({
         id, companyId, payrollRunId: runId, employeeId: e.id, paidDays: out.paidDays, lopDays: out.lopDays, otHours: out.otHours,
         gross: out.gross, totalDeductions: out.totalDeductions, net: out.net, inputs: { ...input, salaryRecordId: sal.id, ruleIds: out.deductions.filter((d) => d.ruleId).map((d) => [d.code, d.ruleId, d.ruleVersion]) } as any,
-        calculation: { earnings: out.earnings, deductions: out.deductions, ratio: out.ratio, employerContribution: out.employerContribution, trace: out.trace } as any,
+        calculation: { earnings: out.earnings, deductions: out.deductions, taxable: out.taxable, ratio: out.ratio, employerContribution: out.employerContribution, trace: out.trace } as any,
         formulaVersion: ENGINE_VERSION, calculatedAt: now, hasWarnings: out.warnings.length > 0, warnings: out.warnings as any,
       });
       out.earnings.forEach((x) => earnRows.push({ id: randomUUID(), detailId: id, code: x.code, name: x.name, amount: x.amount }));
@@ -194,6 +200,22 @@ export class PayrollService {
       } });
     }, { timeout: 120_000, maxWait: 10_000 });
     return { summary };
+  }
+
+  /** Year-to-date taxable (approximated by gross) and TDS already deducted in approved/locked runs of this financial year. */
+  private async loadTdsYtd(companyId: string, ids: string[], year: number, month: number, fyStart: number) {
+    const fyYear = month >= fyStart ? year : year - 1;
+    const runs = await this.prisma.payrollRun.findMany({ where: { companyId, status: { in: ['APPROVED', 'LOCKED'] }, year: { gte: fyYear, lte: year } }, select: { id: true, year: true, month: true } });
+    const inFy = runs.filter((r) => { const k = r.year * 12 + r.month; return k >= fyYear * 12 + fyStart && k < year * 12 + month; });
+    const out = new Map<string, { ytdTaxable: number; ytdTds: number }>();
+    if (!inFy.length) return out;
+    const dets = await this.prisma.payrollDetail.findMany({ where: { payrollRunId: { in: inFy.map((r) => r.id) }, employeeId: { in: ids } }, select: { employeeId: true, gross: true, deductions: { where: { code: 'TDS' }, select: { amount: true } } } });
+    for (const d of dets) {
+      const cur = out.get(d.employeeId) ?? { ytdTaxable: 0, ytdTds: 0 };
+      cur.ytdTaxable += n(d.gross); cur.ytdTds += d.deductions.reduce((s, x) => s + n(x.amount), 0);
+      out.set(d.employeeId, cur);
+    }
+    return out;
   }
 
   // ───────── Status workflow ─────────

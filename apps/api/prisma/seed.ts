@@ -48,8 +48,8 @@ async function main() {
   // Versioned compliance rules. SAMPLE VALUES ONLY: a compliance administrator must
   // verify against current law and add new versions (never edit old ones) when rates change.
   const rules = [
-    { module: 'PF', state: null, version: 1, wageCeiling: 15000, employeePercent: 12, employerPercent: 12, notes: 'SAMPLE - verify against current EPFO rules' },
-    { module: 'ESI', state: null, version: 1, wageCeiling: 21000, employeePercent: 0.75, employerPercent: 3.25, notes: 'SAMPLE - verify against current ESIC rules' },
+    { module: 'PF', state: null, version: 1, wageCeiling: 15000, employeePercent: 12, employerPercent: 12, rules: { dueDay: 15 }, notes: 'SAMPLE - verify against current EPFO rules' },
+    { module: 'ESI', state: null, version: 1, wageCeiling: 21000, employeePercent: 0.75, employerPercent: 3.25, rules: { dueDay: 15, rounding: 'UP' }, notes: 'SAMPLE - verify against current ESIC rules' },
   ] as const;
   for (const r of rules) {
     const exists = await prisma.complianceRule.findFirst({ where: { module: r.module, state: r.state, version: r.version } });
