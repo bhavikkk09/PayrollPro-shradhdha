@@ -30,6 +30,7 @@ export default function Attendance({ companyId, session }: { companyId: string; 
   const [msg, setMsg] = useState('');
   const [modal, setModal] = useState<'import' | 'finalize' | null>(null);
   const canManage = session.user.permissions.includes('attendance.manage');
+  const firm = session.user.type !== 'CLIENT'; // finalizing and reopening a month is the consultant's job
   const n = new Date(year, month, 0).getDate();
   const pageSize = 25;
 
@@ -89,10 +90,10 @@ export default function Attendance({ companyId, session }: { companyId: string; 
           {canManage && !grid?.finalized && <>
             <button onClick={markPresent} className="border rounded-md px-3 py-1.5 text-sm bg-white">Mark unmarked as present</button>
             <button onClick={() => setModal('import')} className="flex items-center gap-1 border rounded-md px-3 py-1.5 text-sm bg-white"><Upload size={14} /> Import</button>
-            <button onClick={() => setModal('finalize')} className="border rounded-md px-3 py-1.5 text-sm bg-white">Finalize month</button>
+            {firm && <button onClick={() => setModal('finalize')} className="border rounded-md px-3 py-1.5 text-sm bg-white">Finalize month</button>}
             <button disabled={!nPending} onClick={save} className="bg-slate-900 text-white rounded-md px-4 py-1.5 text-sm disabled:opacity-40">Save{nPending ? ` (${nPending})` : ''}</button>
           </>}
-          {canManage && grid?.finalized && <button onClick={reopen} className="border rounded-md px-3 py-1.5 text-sm bg-white">Reopen month</button>}
+          {canManage && firm && grid?.finalized && <button onClick={reopen} className="border rounded-md px-3 py-1.5 text-sm bg-white">Reopen month</button>}
         </div>
       </div>
       {err && <ErrorBox text={err} />}

@@ -1,7 +1,7 @@
 export interface Session {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; name: string; email: string; type: string; roles: string[]; permissions: string[] };
+  user: { id: string; name: string; email: string; type: string; roles: string[]; permissions: string[]; mustChangePassword?: boolean };
 }
 
 const KEY = 'lcp.session';
@@ -65,3 +65,12 @@ export const login = async (email: string, password: string) => {
   setSession(b);
   return b as Session;
 };
+
+/** Replaces the password (also used to swap an admin-issued temporary one). Returns a fresh session. */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<Session> {
+  const res = await authed('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) });
+  if (!res.ok) await fail(res);
+  const s: Session = await res.json();
+  setSession(s);
+  return s;
+}

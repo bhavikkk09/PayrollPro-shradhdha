@@ -5,7 +5,7 @@ import { IsBoolean, IsDateString, IsInt, IsNumber, IsObject, IsOptional, IsStrin
 import { Request } from 'express';
 import { AuthUser } from '../common/auth.types';
 import { CompanyAccessGuard } from '../common/company-access';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RequirePermissions, InternalOnly } from '../common/decorators';
 import { LeaveService } from './leave.service';
 
 class TypeDto {
@@ -71,29 +71,29 @@ export class LeaveController {
 
   @Get('types') @RequirePermissions('leave.view')
   types(@Param('companyId') c: string) { return this.svc.listTypes(c); }
-  @Post('types') @RequirePermissions('leave.manage')
+  @InternalOnly() @Post('types') @RequirePermissions('leave.manage')
   addType(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: TypeDto, @Req() r: Request) { return this.svc.createType(u, c, d, r.ip); }
-  @Patch('types/:id') @RequirePermissions('leave.manage')
+  @InternalOnly() @Patch('types/:id') @RequirePermissions('leave.manage')
   editType(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('id') id: string, @Body() d: UpdateTypeDto, @Req() r: Request) { return this.svc.updateType(u, c, id, d, r.ip); }
-  @Delete('types/:id') @RequirePermissions('leave.manage')
+  @InternalOnly() @Delete('types/:id') @RequirePermissions('leave.manage')
   delType(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('id') id: string, @Req() r: Request) { return this.svc.deleteType(u, c, id, r.ip); }
 
-  @Get('policies') @RequirePermissions('leave.view')
+  @InternalOnly() @Get('policies') @RequirePermissions('leave.view')
   policies(@Param('companyId') c: string) { return this.svc.listPolicies(c); }
-  @Put('policies') @RequirePermissions('leave.manage')
+  @InternalOnly() @Put('policies') @RequirePermissions('leave.manage')
   savePolicy(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: PolicyDto, @Req() r: Request) { return this.svc.savePolicy(u, c, d, r.ip); }
 
   @Get('balances') @RequirePermissions('leave.view')
   balances(@Param('companyId') c: string, @Query() q: BalanceQuery) { return this.svc.balances(c, q.employeeId, q.year); }
   @Get('ledger') @RequirePermissions('leave.view')
   ledger(@Param('companyId') c: string, @Query() q: LedgerQuery) { return this.svc.ledger(c, q.employeeId, q.leaveTypeId); }
-  @Post('opening') @RequirePermissions('leave.manage')
+  @InternalOnly() @Post('opening') @RequirePermissions('leave.manage')
   opening(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: OpeningDto, @Req() r: Request) { return this.svc.opening(u, c, d, r.ip); }
-  @Post('adjust') @RequirePermissions('leave.manage')
+  @InternalOnly() @Post('adjust') @RequirePermissions('leave.manage')
   adjust(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: AdjustDto, @Req() r: Request) { return this.svc.adjust(u, c, d, r.ip); }
-  @Post('accrue') @RequirePermissions('leave.manage')
+  @InternalOnly() @Post('accrue') @RequirePermissions('leave.manage')
   accrue(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: AccrueDto, @Req() r: Request) { return this.svc.accrue(u, c, d.year, d.month, r.ip); }
-  @Post('encash') @RequirePermissions('leave.manage')
+  @InternalOnly() @Post('encash') @RequirePermissions('leave.manage')
   encash(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: EncashDto, @Req() r: Request) { return this.svc.encash(u, c, d, r.ip); }
 
   @Get('requests') @RequirePermissions('leave.view')

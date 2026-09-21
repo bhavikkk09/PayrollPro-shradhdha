@@ -51,7 +51,8 @@ Bank account, PAN, Aadhaar reference use `*Enc` columns (application-level AES-G
 | 5 Payroll Engine | Done (pure engine v1.0.0, rule-driven PF/ESI/PT/LWF, OT, arrears/bonus, loans, run workflow DRAFT..LOCKED, unlock audit, bulk payroll). F&F settlement and automatic TDS are not built yet |
 | 6 Compliance framework | Done (versioned rule master with tenant-safe ownership, rule validation, calc preview, automatic TDS, registrations, central compliance calendar with statuses, period summaries) |
 | 7 Reports, payslips, Excel/PDF/CSV/Print | Done (16 reports, payslip PDF with branding, CSV/XLSX/PDF/JSON/print, export audit, masked bank details) |
-| 8-10 | Schema and migration ready; modules to be built phase by phase |
+| 8 Client portal | Done (user management, client roles limited to their own companies, internal-only routes, sanitised payroll/compliance views, forced password change, portal home) |
+| 9-10 | Schema and migration ready; modules to be built phase by phase |
 
 ## ERD
 ```mermaid
@@ -120,3 +121,11 @@ Formulas are data, evaluated by a small parser (`salary/formula.ts`), never `eva
 * Safety: CSV text cells that start with = + - @ get an apostrophe (formula injection); XLSX text is always a text cell; downloads set `Content-Disposition: attachment` and `nosniff`. Downloads need `reports.export`; every export and payslip generation is audited. Bank statements show masked account numbers unless the caller has `employee.sensitive`, and full-number exports are audited separately.
 * Payslips: one A4 page per employee, company colour/title/footer configurable in company settings, amount in words (Indian numbering), DRAFT watermark unless the run is approved or locked.
 * Limits: PDF uses built-in fonts (Latin only; the rupee sign prints as "Rs." and other scripts as "?"). Embed a Unicode font before printing Gujarati/Hindi names. PDF and XLSX are capped at 20,000 rows (use CSV). Company logo needs file storage (Phase 9).
+
+## Client portal (Phase 8)
+* A client is a user of type CLIENT with `CLIENT_ADMIN` or `CLIENT_HR`, linked to specific companies in `company_users`. Client users hold no firm id (`consultantId` is null), so any code that mistakenly trusts a firm id cannot reach firm data through them. Company access is the same server-side check as everywhere else: another company looks like it does not exist (404).
+* `@InternalOnly()` marks routes for the consultant firm only (rule master, calculation preview, bulk payroll, user management, shifts, salary setup is already outside client permissions, attendance finalize/reopen, leave setup and ledger changes). `PermissionsGuard` returns 403 to CLIENT users on them even if a permission were granted.
+* Client responses are sanitised: payroll runs drop rule snapshots, engine version, who processed/approved/locked and non-error issues; payroll details drop inputs, calculation trace and warnings; compliance tasks hide assignees; the dashboard hides the audit trail. Bank/PAN stay masked and cannot be revealed.
+* User management (`/users`, firm admins only): create firm staff or client users, change role/companies/active, reset password. Roles are checked against the user type (no SUPER_ADMIN via API), companies must be ones the admin can access, you cannot demote or deactivate yourself, and the last active firm admin cannot be removed. Every change is audited and ends the user's refresh tokens; existing access tokens expire within 15 minutes.
+* Passwords: admin-issued passwords are one-time (`mustChangePassword`). The token carries the flag and every route except change-password returns 403 `PASSWORD_CHANGE_REQUIRED` until it is replaced. Minimum 10 characters with a letter and a number; changing a password ends all other sessions. Deactivated users cannot refresh.
+* Limits: no email delivery yet, so temporary passwords are shown once to the admin to hand over. Document upload by clients arrives with Phase 9.

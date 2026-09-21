@@ -5,7 +5,7 @@ import { IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, Length, 
 import { Request } from 'express';
 import { AuthUser } from '../common/auth.types';
 import { CompanyAccessGuard } from '../common/company-access';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RequirePermissions, InternalOnly } from '../common/decorators';
 import { ComplianceService } from './compliance.service';
 import { MODULES } from './rule-validate';
 
@@ -68,16 +68,16 @@ class PeriodQuery {
 export class ComplianceController {
   constructor(private svc: ComplianceService) {}
 
-  @Get('rules') @RequirePermissions('compliance.view')
+  @InternalOnly() @Get('rules') @RequirePermissions('compliance.view')
   rules(@CurrentUser() u: AuthUser, @Query() q: RulesQuery) { return this.svc.listRules(u, q); }
-  @Post('rules') @RequirePermissions('compliance.config')
+  @InternalOnly() @Post('rules') @RequirePermissions('compliance.config')
   createRule(@CurrentUser() u: AuthUser, @Body() d: RuleDto, @Req() r: Request) { return this.svc.createRule(u, d as any, r.ip); }
-  @Post('calc-preview') @RequirePermissions('compliance.view')
+  @InternalOnly() @Post('calc-preview') @RequirePermissions('compliance.view')
   preview(@CurrentUser() u: AuthUser, @Body() d: PreviewDto) { return this.svc.preview(u, d); }
 
   @Get('calendar') @RequirePermissions('compliance.view')
   calendar(@CurrentUser() u: AuthUser, @Query() q: CalendarQuery) { return this.svc.calendar(u, q); }
-  @Get('tasks/:id/assignees') @RequirePermissions('compliance.view')
+  @InternalOnly() @Get('tasks/:id/assignees') @RequirePermissions('compliance.view')
   assignees(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.svc.assignees(u, id); }
   @Post('tasks/:id/assign') @RequirePermissions('compliance.manage')
   assign(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: AssignDto, @Req() r: Request) { return this.svc.assign(u, id, d.userId ?? null, r.ip); }

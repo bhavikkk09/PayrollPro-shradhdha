@@ -5,7 +5,7 @@ import { Request } from 'express';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/auth.types';
 import { CompanyAccessGuard } from '../common/company-access';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RequirePermissions, InternalOnly } from '../common/decorators';
 import { PrismaService } from '../prisma/prisma.service';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -40,6 +40,7 @@ class ShiftService {
 
 @ApiTags('Shift (optional)')
 @ApiBearerAuth()
+@InternalOnly()
 @UseGuards(CompanyAccessGuard)
 @Controller('companies/:companyId/shifts')
 export class ShiftController {

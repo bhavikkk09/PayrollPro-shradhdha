@@ -76,7 +76,7 @@ export class DashboardController {
       },
       upcomingDue: dueSoon.map((t) => ({ id: t.id, company: t.company.name, name: t.name, module: t.module, dueDate: t.dueDate, status: t.status })),
       recentPayroll: recentRuns.map((r) => ({ id: r.id, company: r.company.name, year: r.year, month: r.month, status: r.status })),
-      recentActivity: activity.map((a) => ({ id: String(a.id), action: a.action, module: a.module, at: a.createdAt })),
+      recentActivity: u.type === 'CLIENT' ? [] : activity.map((a) => ({ id: String(a.id), action: a.action, module: a.module, at: a.createdAt })),
       companies: rows,
     };
   }

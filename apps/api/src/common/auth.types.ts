@@ -6,4 +6,5 @@ export interface AuthUser {
   consultantId: string | null;
   roles: string[];
   permissions: string[];
+  mustChangePassword?: boolean;
 }

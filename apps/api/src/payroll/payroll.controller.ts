@@ -5,7 +5,8 @@ import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, 
 import { Request } from 'express';
 import { AuthUser } from '../common/auth.types';
 import { CompanyAccessGuard } from '../common/company-access';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RequirePermissions, InternalOnly } from '../common/decorators';
+import { clientDetail, clientRow, clientRun } from '../common/client-view';
 import { PayrollService } from './payroll.service';
 
 class YearQuery { @IsOptional() @Type(() => Number) @IsInt() year?: number; }
@@ -52,14 +53,17 @@ export class PayrollController {
   @Post('runs') @RequirePermissions('payroll.process')
   create(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: RunDto, @Req() r: Request) { return this.svc.createRun(u, c, d.year, d.month, r.ip); }
   @Get('runs/:id') @RequirePermissions('payroll.view')
-  run(@Param('companyId') c: string, @Param('id') id: string) { return this.svc.getRun(c, id); }
+  async run(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('id') id: string) { return clientRun(u, await this.svc.getRun(c, id)); }
   @Delete('runs/:id') @RequirePermissions('payroll.process')
   remove(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('id') id: string, @Req() r: Request) { return this.svc.deleteRun(u, c, id, r.ip); }
 
   @Get('runs/:id/details') @RequirePermissions('payroll.view')
-  details(@Param('companyId') c: string, @Param('id') id: string, @Query() q: DetailsQuery) { return this.svc.details(c, id, q); }
+  async details(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('id') id: string, @Query() q: DetailsQuery) {
+    const r = await this.svc.details(c, id, q);
+    return { ...r, items: r.items.map((x) => clientRow(u, x)) };
+  }
   @Get('runs/:id/details/:employeeId') @RequirePermissions('payroll.view')
-  detail(@Param('companyId') c: string, @Param('id') id: string, @Param('employeeId') e: string) { return this.svc.detail(c, id, e); }
+  async detail(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('id') id: string, @Param('employeeId') e: string) { return clientDetail(u, await this.svc.detail(c, id, e)); }
 
   @Post('runs/:id/process') @RequirePermissions('payroll.process')
   process(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('id') id: string, @Req() r: Request) { return this.svc.process(u, c, id, r.ip); }
@@ -87,6 +91,7 @@ export class PayrollController {
 /** Multi-company payroll. Company access is checked per company inside the service, never trusted from the body. */
 @ApiTags('Payroll')
 @ApiBearerAuth()
+@InternalOnly()
 @Controller('payroll/bulk')
 export class BulkPayrollController {
   constructor(private svc: PayrollService) {}

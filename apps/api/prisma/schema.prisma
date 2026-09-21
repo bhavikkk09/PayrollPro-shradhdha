@@ -149,6 +149,7 @@ model User {
   name           String
   phone          String?
   active         Boolean   @default(true)
+  mustChangePassword Boolean @default(false) // set for admin-issued temporary passwords
   failedLogins   Int       @default(0)
   lockedUntil    DateTime?
   lastLoginAt    DateTime?

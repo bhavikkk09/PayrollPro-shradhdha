@@ -176,7 +176,7 @@ export class ComplianceService {
     ]);
     const uids = [...new Set(items.map((i) => i.assignedTo).filter(Boolean) as string[])];
     const users = new Map((await this.prisma.user.findMany({ where: { id: { in: uids } }, select: { id: true, name: true } })).map((x) => [x.id, x.name]));
-    return { total, page: q.page, pageSize: q.pageSize, items: items.map((i) => ({ ...i, assignedName: i.assignedTo ? users.get(i.assignedTo) ?? null : null })) };
+    return { total, page: q.page, pageSize: q.pageSize, items: items.map((i) => (u.type === 'CLIENT' ? { ...i, assignedTo: null, assignedName: null } : { ...i, assignedName: i.assignedTo ? users.get(i.assignedTo) ?? null : null })) };
   }
 
   private async task(u: AuthUser, id: string) {

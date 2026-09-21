@@ -5,7 +5,7 @@ import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, 
 import { Request } from 'express';
 import { AuthUser } from '../common/auth.types';
 import { CompanyAccessGuard } from '../common/company-access';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RequirePermissions, InternalOnly } from '../common/decorators';
 import { STATUSES } from './attendance-summary';
 import { AttendanceService } from './attendance.service';
 
@@ -63,9 +63,9 @@ export class AttendanceController {
   @Post('import/:jobId/confirm') @RequirePermissions('attendance.manage')
   confirm(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('jobId') j: string, @Body() d: ConfirmDto, @Req() r: Request) { return this.svc.importConfirm(u, c, j, !!d.skipInvalid, r.ip); }
 
-  @Post('finalize') @RequirePermissions('attendance.manage')
+  @InternalOnly() @Post('finalize') @RequirePermissions('attendance.manage')
   finalize(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: FinalizeDto, @Req() r: Request) { return this.svc.finalize(u, c, d.year, d.month, d.unmarkedAs, r.ip); }
 
-  @Post('reopen') @RequirePermissions('attendance.manage')
+  @InternalOnly() @Post('reopen') @RequirePermissions('attendance.manage')
   reopen(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: ReopenDto, @Req() r: Request) { return this.svc.reopen(u, c, d.year, d.month, r.ip); }
 }
