@@ -13,6 +13,7 @@ import { BulkPayrollController, PayrollController } from './payroll/payroll.cont
 import { PayrollService } from './payroll/payroll.service';
 import { ComplianceController, CompanyComplianceController } from './compliance/compliance.controller';
 import { ComplianceService } from './compliance/compliance.service';
+import { HealthController } from './health.controller';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { CompanyAccessGuard, CompanyAccessService } from './common/company-access';
@@ -43,7 +44,7 @@ import { PrismaModule } from './prisma/prisma.service';
     PrismaModule,
     AuditModule,
   ],
-  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController, AttendanceController, LeaveController, ShiftController, PayrollController, BulkPayrollController, ComplianceController, CompanyComplianceController],
+  controllers: [HealthController, AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController, AttendanceController, LeaveController, ShiftController, PayrollController, BulkPayrollController, ComplianceController, CompanyComplianceController],
   providers: [
     AuthService, CompaniesService, EmployeesService, SalaryService, AttendanceService, LeaveService, PayrollService, ComplianceService, CompanyAccessService, CompanyAccessGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },

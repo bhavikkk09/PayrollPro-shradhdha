@@ -17,13 +17,15 @@ services:
     ports: ["6379:6379"]
 
   api:
-    build: { context: ., dockerfile: apps/api/Dockerfile }
+    build: { context: ., dockerfile: Dockerfile }
     environment:
       DATABASE_URL: postgresql://lcp:${DB_PASSWORD:-lcp}@db:5432/lcp?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ chars)}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY (openssl rand -hex 32)}
-      CORS_ORIGINS: http://localhost:5173
+      CORS_ORIGINS: http://localhost:3000
+      RUN_SEED: 'true'
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?set SEED_ADMIN_PASSWORD (10+ chars)}
     depends_on:
       db: { condition: service_healthy }
     ports: ["3000:3000"]

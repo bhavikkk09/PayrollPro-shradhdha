@@ -1,0 +1,36 @@
+# Render Blueprint: one web service (API + web app) and one PostgreSQL database.
+# Free plans are for trying it out. Move both to a paid plan before real payroll data goes in.
+databases:
+  - name: lcp-db
+    plan: free
+    databaseName: lcp
+    user: lcp
+
+services:
+  - type: web
+    name: labour-consult-pro
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lcp-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY   # 64 hex chars: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+        sync: false
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_CONSULTANT_NAME
+        value: My Consultancy
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: RUN_SEED
+        value: "true"

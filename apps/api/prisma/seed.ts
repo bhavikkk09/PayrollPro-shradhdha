@@ -17,15 +17,19 @@ async function main() {
   }
   const roleId = async (key: string) => (await prisma.role.findUniqueOrThrow({ where: { key } })).id;
 
-  // Demo consultant + admin (DEMO ONLY: change password immediately in real use)
+  // First consultant account and its admin. In production the password must be supplied, never defaulted.
+  const production = process.env.NODE_ENV === 'production';
+  const password = process.env.SEED_ADMIN_PASSWORD ?? (production ? '' : 'Admin@12345');
+  if (password.length < 10) throw new Error('Set SEED_ADMIN_PASSWORD (at least 10 characters)');
+  const adminEmail = (process.env.SEED_ADMIN_EMAIL ?? 'admin@demo-consultant.in').toLowerCase().trim();
+  const consultantName = process.env.SEED_CONSULTANT_NAME ?? 'Demo Labour Consultants';
   const consultant = await prisma.consultant.upsert({
-    where: { email: 'office@demo-consultant.in' }, update: {},
-    create: { name: 'Demo Labour Consultants', email: 'office@demo-consultant.in' },
+    where: { email: adminEmail }, update: {}, create: { name: consultantName, email: adminEmail },
   });
-  const hash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345', 12);
+  const hash = await bcrypt.hash(password, 12);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@demo-consultant.in' }, update: {},
-    create: { email: 'admin@demo-consultant.in', name: 'Consultant Admin', type: 'CONSULTANT', consultantId: consultant.id, passwordHash: hash },
+    where: { email: adminEmail }, update: {},
+    create: { email: adminEmail, name: 'Consultant Admin', type: 'CONSULTANT', consultantId: consultant.id, passwordHash: hash },
   });
   await prisma.userRole.upsert({
     where: { userId_roleId: { userId: admin.id, roleId: await roleId('CONSULTANT_ADMIN') } },
@@ -38,7 +42,7 @@ async function main() {
     { code: 'XYZ', name: 'XYZ Pvt Ltd', city: 'Ahmedabad', state: 'Gujarat' },
     { code: 'SHREE', name: 'Shree Engineering', city: 'Surat', state: 'Gujarat' },
   ];
-  for (const c of demo) {
+  for (const c of process.env.SEED_DEMO_DATA === 'false' ? [] : demo) {
     await prisma.company.upsert({
       where: { consultantId_code: { consultantId: consultant.id, code: c.code } }, update: {},
       create: { ...c, consultantId: consultant.id, settings: { create: {} } },
@@ -55,7 +59,7 @@ async function main() {
     const exists = await prisma.complianceRule.findFirst({ where: { module: r.module, state: r.state, version: r.version } });
     if (!exists) await prisma.complianceRule.create({ data: { ...r, effectiveFrom: new Date('2024-04-01') } });
   }
-  console.log('Seed complete. Login: admin@demo-consultant.in');
+  console.log(`Seed complete. Admin login: ${adminEmail}`);
 }
 
 main().finally(() => prisma.$disconnect());
