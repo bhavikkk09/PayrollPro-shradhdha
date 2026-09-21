@@ -46,7 +46,8 @@ Bank account, PAN, Aadhaar reference use `*Enc` columns (application-level AES-G
 |---|---|
 | 1 Setup, auth, RBAC, dashboard, company master | API done (auth, companies, settings, dashboard); UI in `apps/web` |
 | 2 Branch, Department, Designation, Location, Employee Master | Done (API + UI, encrypted bank/PAN/Aadhaar, masked by default, reveal is permission-gated and audited) |
-| 3-10 | Schema and migration ready; modules to be built phase by phase |
+| 3 Salary components, structures, employee salary | Done (safe formula engine, pure calculator, effective-dated salary with stored snapshot) |
+| 4-10 | Schema and migration ready; modules to be built phase by phase |
 
 ## ERD
 ```mermaid
@@ -81,3 +82,6 @@ erDiagram
   ComplianceRule }o--o{ ComplianceTask : governs
   Company ||--o{ Document : stores
 ```
+
+## Salary formulas (Phase 3)
+Formulas are data, evaluated by a small parser (`salary/formula.ts`), never `eval`. Allowed: numbers, `+ - * /`, parentheses, component codes, `GROSS`, `MIN MAX ROUND FLOOR CEIL`. A structure runs items in sequence order; a formula may use only `GROSS` and earlier components. `calculateSalary()` is pure and deterministic and rounds every line to 2 decimals. Saving a structure dry-runs it, so broken formulas are rejected up front. Assigning salary stores the computed breakup as a snapshot on `employee_salary` and closes the previous record the day before, so later rule edits never change recorded salary or past payroll.

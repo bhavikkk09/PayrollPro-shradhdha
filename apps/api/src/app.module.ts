@@ -14,6 +14,8 @@ import { DashboardController } from './dashboard/dashboard.controller';
 import { EmployeesController } from './employees/employees.controller';
 import { EmployeesService } from './employees/employees.service';
 import { OrgController } from './org/org.controller';
+import { SalaryController } from './salary/salary.controller';
+import { SalaryService } from './salary/salary.service';
 import { PrismaModule } from './prisma/prisma.service';
 
 @Module({
@@ -32,9 +34,9 @@ import { PrismaModule } from './prisma/prisma.service';
     PrismaModule,
     AuditModule,
   ],
-  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController],
+  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController],
   providers: [
-    AuthService, CompaniesService, EmployeesService, CompanyAccessService, CompanyAccessGuard,
+    AuthService, CompaniesService, EmployeesService, SalaryService, CompanyAccessService, CompanyAccessGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

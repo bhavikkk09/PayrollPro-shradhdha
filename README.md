@@ -15,4 +15,4 @@ Docker: `JWT_SECRET=... docker compose up --build` (adds Postgres, Redis, daily 
 
 ## Status
 Phase 1 done: auth, RBAC, company master + settings (shift OFF by default), dashboard, audit log, tenant isolation tests.
-Phase 2 done: org masters + employee master (sensitive fields encrypted). Re-run `npm run db:seed` after pulling to add the new employee.sensitive permission. Phases 3-10 next.
+Phase 2 done: org masters + employee master. Phase 3 done: salary components, structures, employee salary. Re-run `npm run db:seed` to pick up new permissions. Phases 4-10 next.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Eye, Plus, X } from 'lucide-react';
 import { api, type Session } from '../api';
 import { Badge, Empty, ErrorBox } from '../components/ui';
+import EmployeeSalary from '../components/EmployeeSalary';
 
 interface Emp {
   id: string; code: string; firstName: string; middleName?: string | null; lastName?: string | null; status: string;
@@ -202,6 +203,7 @@ function EmployeeDrawer({ companyId, id, can, onClose, onSaved }: {
             )}
           </section>
         ))}
+        {id && can('salary.view') && <EmployeeSalary companyId={companyId} employeeId={id} canManage={can('salary.manage')} />}
         {!readOnly && <button disabled={busy} className="bg-slate-900 text-white rounded-md px-4 py-2 text-sm disabled:opacity-60">{busy ? 'Saving…' : 'Save'}</button>}
       </form>
     </div>
