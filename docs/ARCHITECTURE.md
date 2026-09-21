@@ -45,7 +45,8 @@ Bank account, PAN, Aadhaar reference use `*Enc` columns (application-level AES-G
 | Phase | Status |
 |---|---|
 | 1 Setup, auth, RBAC, dashboard, company master | API done (auth, companies, settings, dashboard); UI in `apps/web` |
-| 2-10 | Schema and migration ready; modules to be built phase by phase |
+| 2 Branch, Department, Designation, Location, Employee Master | Done (API + UI, encrypted bank/PAN/Aadhaar, masked by default, reveal is permission-gated and audited) |
+| 3-10 | Schema and migration ready; modules to be built phase by phase |
 
 ## ERD
 ```mermaid

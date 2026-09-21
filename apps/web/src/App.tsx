@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, LogOut, Users, Wallet, ShieldCheck, FileText, Menu } from 'lucide-react';
+import { Building2, LayoutDashboard, LogOut, Users, Network, Wallet, ShieldCheck, FileText, Menu } from 'lucide-react';
 import { api, getSession, setSession, type Session } from './api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Employees from './pages/Employees';
+import Organisation from './pages/Organisation';
 import Companies, { type Company } from './pages/Companies';
 
-type Page = 'dashboard' | 'companies';
+type Page = 'dashboard' | 'companies' | 'employees' | 'organisation';
 
 const NAV: { key: Page | 'soon'; label: string; icon: typeof Users; soon?: boolean }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { key: 'companies', label: 'Companies', icon: Building2 },
-  { key: 'soon', label: 'Employees', icon: Users, soon: true },
+  { key: 'organisation', label: 'Organisation', icon: Network },
+  { key: 'employees', label: 'Employees', icon: Users },
   { key: 'soon', label: 'Payroll', icon: Wallet, soon: true },
   { key: 'soon', label: 'Compliance', icon: ShieldCheck, soon: true },
   { key: 'soon', label: 'Reports', icon: FileText, soon: true },
@@ -74,6 +77,11 @@ export default function App() {
         <main className="p-4 md:p-6">
           {page === 'dashboard' && <Dashboard companyId={companyId} />}
           {page === 'companies' && <Companies session={session} />}
+          {(page === 'employees' || page === 'organisation') && (companyId === 'ALL'
+            ? <div className="text-sm text-slate-600 bg-white border rounded-xl p-6">Select a company from the top bar to continue.</div>
+            : page === 'employees'
+              ? <Employees key={companyId} companyId={companyId} session={session} />
+              : <Organisation key={companyId} companyId={companyId} session={session} />)}
         </main>
       </div>
     </div>

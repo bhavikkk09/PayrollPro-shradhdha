@@ -11,6 +11,9 @@ import { JwtAuthGuard, PermissionsGuard } from './common/guards';
 import { CompaniesController } from './companies/companies.controller';
 import { CompaniesService } from './companies/companies.service';
 import { DashboardController } from './dashboard/dashboard.controller';
+import { EmployeesController } from './employees/employees.controller';
+import { EmployeesService } from './employees/employees.service';
+import { OrgController } from './org/org.controller';
 import { PrismaModule } from './prisma/prisma.service';
 
 @Module({
@@ -22,15 +25,16 @@ import { PrismaModule } from './prisma/prisma.service';
       useFactory: (c: ConfigService) => {
         const secret = c.get<string>('JWT_SECRET');
         if (!secret || secret.length < 32) throw new Error('JWT_SECRET must be set (32+ chars)');
+        if (!/^[0-9a-f]{64}$/i.test(c.get<string>('ENCRYPTION_KEY') ?? '')) throw new Error('ENCRYPTION_KEY must be 64 hex chars (openssl rand -hex 32)');
         return { secret, signOptions: { expiresIn: '15m' } };
       },
     }),
     PrismaModule,
     AuditModule,
   ],
-  controllers: [AuthController, CompaniesController, DashboardController],
+  controllers: [AuthController, CompaniesController, DashboardController, OrgController, EmployeesController],
   providers: [
-    AuthService, CompaniesService, CompanyAccessService, CompanyAccessGuard,
+    AuthService, CompaniesService, EmployeesService, CompanyAccessService, CompanyAccessGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

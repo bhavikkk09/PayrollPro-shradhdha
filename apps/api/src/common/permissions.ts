@@ -2,7 +2,7 @@
 // Seeded into the DB; the DB (roles/permissions tables) is authoritative at runtime.
 export const PERMISSIONS = [
   'company.view', 'company.create', 'company.edit', 'company.delete',
-  'branch.manage', 'employee.view', 'employee.create', 'employee.edit', 'employee.delete',
+  'branch.manage', 'employee.view', 'employee.create', 'employee.edit', 'employee.delete', 'employee.sensitive',
   'salary.view', 'salary.manage', 'attendance.view', 'attendance.manage',
   'leave.view', 'leave.manage', 'leave.approve',
   'payroll.view', 'payroll.process', 'payroll.approve', 'payroll.lock', 'payroll.unlock',
@@ -21,7 +21,7 @@ export const ROLE_MATRIX: Record<string, { name: string; permissions: Permission
   CONSULTANT_STAFF: {
     name: 'Consultant Staff',
     permissions: ALL.filter(
-      (p) => !['company.delete', 'users.manage', 'settings.manage', 'payroll.unlock', 'compliance.config', 'employee.delete'].includes(p),
+      (p) => !['company.delete', 'users.manage', 'settings.manage', 'payroll.unlock', 'compliance.config', 'employee.delete', 'employee.sensitive'].includes(p),
     ),
   },
   CLIENT_ADMIN: {
