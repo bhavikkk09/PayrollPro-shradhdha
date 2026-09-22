@@ -39,3 +39,24 @@ export async function parseAttendanceFile(file: File): Promise<ImportRow[]> {
     return o;
   });
 }
+
+export interface QuickImportRow { employeeCode: string; paidDays: string; otHours: string }
+
+const QUICK_HEAD: Record<string, keyof QuickImportRow> = {
+  'employee code': 'employeeCode', 'emp code': 'employeeCode', code: 'employeeCode', employeecode: 'employeeCode',
+  'days worked': 'paidDays', 'paid days': 'paidDays', 'present days': 'paidDays', days: 'paidDays', paiddays: 'paidDays',
+  'ot hours': 'otHours', ot: 'otHours', othours: 'otHours',
+};
+
+/** Reads .xlsx or .csv with just Employee Code + total days worked (no daily columns). */
+export async function parseQuickAttendanceFile(file: File): Promise<QuickImportRow[]> {
+  const raw: unknown[][] = /\.xlsx$/i.test(file.name) ? ((await readSheet(file)) as unknown[][]) : csv(await file.text());
+  if (raw.length < 2) throw new Error('The file has no data rows');
+  const cols = raw[0].map((h) => QUICK_HEAD[String(h ?? '').trim().toLowerCase()]);
+  if (!cols.includes('employeeCode') || !cols.includes('paidDays')) throw new Error('Header row must contain: Employee Code, Days Worked (and optionally OT Hours)');
+  return raw.slice(1).filter((r) => r.some((c) => cell(c) !== '')).map((r) => {
+    const o: QuickImportRow = { employeeCode: '', paidDays: '', otHours: '' };
+    cols.forEach((k, i) => { if (k) o[k] = cell(r[i]); });
+    return o;
+  });
+}

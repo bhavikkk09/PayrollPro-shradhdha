@@ -5,7 +5,8 @@ import { AuthUser } from '../common/auth.types';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { validateAttendanceRows, RawRow, ValidRow } from './attendance-import';
-import { CalcMethod, dateKey, daysInMonth, MonthSummary, Status, summarizeMonth } from './attendance-summary';
+import { buildQuickEntries, QuickRawRow } from './attendance-quick-import';
+import { CalcMethod, dateKey, daysInMonth, MonthSummary, Status, summarizeMonth, workingDatesBetween } from './attendance-summary';
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 const ymd = (s: string) => new Date(`${s}T00:00:00.000Z`);
@@ -156,6 +157,60 @@ export class AttendanceService {
     await this.prisma.importJob.update({ where: { id: jobId }, data: { status: 'CONFIRMED', stagedData: Prisma.DbNull } });
     await this.audit.log({ userId: u.id, companyId, action: 'ATTENDANCE_IMPORTED', module: 'attendance', recordId: jobId, newValue: { rows: rows.length, skipped: job.errorRows }, ip });
     return { imported: rows.length, skipped: job.errorRows };
+  }
+
+  // ───────── Quick import: "employee worked N days this month", no daily grid needed ─────────
+  // Salary itself is never part of this file - payroll always reads the employee's assigned
+  // salary structure, the same as when attendance is entered day-by-day.
+  async quickImportValidate(u: AuthUser, companyId: string, fileName: string, year: number, month: number, rows: QuickRawRow[]) {
+    const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+    let lockedMessage: string | null = null;
+    try { await this.assertEditable(companyId, [monthKey]); } catch (e) { lockedMessage = (e as Error).message; }
+
+    const st = await this.settings(companyId);
+    const holidays = await this.holidaySet(companyId, year, month);
+    const monthStart = dateKey(year, month, 1);
+    const monthEnd = dateKey(year, month, daysInMonth(year, month));
+    const emps = await this.prisma.employee.findMany({ where: this.employeesInMonth(companyId, year, month), select: { id: true, code: true, doj: true, dol: true } });
+    const employeeMap = new Map(emps.map((e) => {
+      const from = iso(e.doj) > monthStart ? iso(e.doj) : monthStart;
+      const to = e.dol && iso(e.dol) < monthEnd ? iso(e.dol) : monthEnd;
+      return [e.code.toUpperCase(), { id: e.id, workingDates: workingDatesBetween(from, to, st.weeklyOff, holidays) }];
+    }));
+
+    const { valid, errors } = buildQuickEntries(rows, employeeMap, st.otEnabled);
+    const usable = lockedMessage ? [] : valid;
+    const allErrors = lockedMessage ? [...errors, { row: 0, message: lockedMessage }] : errors;
+
+    const job = await this.prisma.importJob.create({
+      data: {
+        companyId, kind: 'ATTENDANCE_QUICK', fileName: fileName.slice(0, 200), status: allErrors.length ? 'HAS_ERRORS' : 'VALIDATED',
+        totalRows: rows.length, validRows: new Set(usable.map((v) => v.employeeId)).size, errorRows: allErrors.length,
+        errors: allErrors.slice(0, 500) as any, stagedData: { year, month, entries: usable } as any, createdBy: u.id,
+      },
+    });
+    if (errors.length) this.notifications?.safe(() => this.notifications!.notifyUser(u.id, companyId, 'IMPORT_ERROR', { title: `Attendance quick-import has ${errors.length} error${errors.length === 1 ? '' : 's'}`, body: fileName.slice(0, 100), link: 'attendance' }));
+
+    const codeById = new Map(emps.map((e) => [e.id, e.code]));
+    const daysByEmp = new Map<string, number>();
+    for (const e of usable) daysByEmp.set(e.employeeId, (daysByEmp.get(e.employeeId) ?? 0) + (e.status === 'ABSENT' ? 0 : e.status === 'HALF_DAY' ? 0.5 : 1));
+    const preview = [...daysByEmp.entries()].slice(0, 20).map(([id, paidDays]) => ({ employeeCode: codeById.get(id), paidDays }));
+
+    return { jobId: job.id, totalRows: rows.length, validRows: daysByEmp.size, errorRows: allErrors.length, errors: allErrors.slice(0, 200), preview, year, month };
+  }
+
+  async quickImportConfirm(u: AuthUser, companyId: string, jobId: string, skipInvalid: boolean, ip?: string) {
+    const job = await this.prisma.importJob.findFirst({ where: { id: jobId, companyId, kind: 'ATTENDANCE_QUICK' } });
+    if (!job) throw new NotFoundException('Import not found');
+    if (job.status === 'CONFIRMED') throw new ConflictException('This import was already applied');
+    if (job.status === 'HAS_ERRORS' && !skipInvalid) throw new BadRequestException('The file has errors. Fix and re-upload, or import only the valid rows.');
+    const staged = job.stagedData as unknown as { year: number; month: number; entries: { employeeId: string; date: string; status: Status; otHours: number }[] };
+    await this.assertEditable(companyId, [`${staged.year}-${String(staged.month).padStart(2, '0')}`]); // re-check: state may have changed since validation
+    await this.write(companyId, staged.entries, 'QUICK_IMPORT');
+    await this.prisma.importJob.update({ where: { id: jobId }, data: { status: 'CONFIRMED', stagedData: Prisma.DbNull } });
+    const employeeCount = new Set(staged.entries.map((e) => e.employeeId)).size;
+    await this.audit.log({ userId: u.id, companyId, action: 'ATTENDANCE_QUICK_IMPORTED', module: 'attendance', recordId: jobId, newValue: { employees: employeeCount }, ip });
+    return { imported: employeeCount };
   }
 
   // ───────── Month close ─────────

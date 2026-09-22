@@ -34,6 +34,17 @@ class ValidateDto {
   @IsArray() @ArrayMaxSize(20000) @ValidateNested({ each: true }) @Type(() => RowDto) rows: RowDto[];
 }
 class ConfirmDto { @IsOptional() @IsBoolean() skipInvalid?: boolean; }
+class QuickRowDto {
+  @IsOptional() employeeCode?: unknown;
+  @IsOptional() paidDays?: unknown;
+  @IsOptional() otHours?: unknown;
+}
+class QuickValidateDto {
+  @IsString() @MaxLength(200) fileName: string;
+  @IsInt() @Min(2000) @Max(2100) year: number;
+  @IsInt() @Min(1) @Max(12) month: number;
+  @IsArray() @ArrayMaxSize(2000) @ValidateNested({ each: true }) @Type(() => QuickRowDto) rows: QuickRowDto[];
+}
 class FinalizeDto {
   @IsInt() @Min(2000) @Max(2100) year: number;
   @IsInt() @Min(1) @Max(12) month: number;
@@ -62,6 +73,13 @@ export class AttendanceController {
 
   @Post('import/:jobId/confirm') @RequirePermissions('attendance.manage')
   confirm(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('jobId') j: string, @Body() d: ConfirmDto, @Req() r: Request) { return this.svc.importConfirm(u, c, j, !!d.skipInvalid, r.ip); }
+
+  /** For consultants who only get a total "days worked" per employee, not a daily register. */
+  @Post('quick-import/validate') @RequirePermissions('attendance.manage')
+  quickValidate(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: QuickValidateDto) { return this.svc.quickImportValidate(u, c, d.fileName, d.year, d.month, d.rows); }
+
+  @Post('quick-import/:jobId/confirm') @RequirePermissions('attendance.manage')
+  quickConfirm(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Param('jobId') j: string, @Body() d: ConfirmDto, @Req() r: Request) { return this.svc.quickImportConfirm(u, c, j, !!d.skipInvalid, r.ip); }
 
   @InternalOnly() @Post('finalize') @RequirePermissions('attendance.manage')
   finalize(@CurrentUser() u: AuthUser, @Param('companyId') c: string, @Body() d: FinalizeDto, @Req() r: Request) { return this.svc.finalize(u, c, d.year, d.month, d.unmarkedAs, r.ip); }
