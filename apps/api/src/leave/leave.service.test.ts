@@ -25,6 +25,7 @@ const prisma: any = {
   },
   leaveBalance: {
     findUnique: async ({ where }: any) => db.balances.find((b) => b.employeeId === key(where).employeeId && b.leaveTypeId === key(where).leaveTypeId && b.year === key(where).year) ?? null,
+    findMany: async ({ where }: any) => db.balances.filter((b) => b.leaveTypeId === where.leaveTypeId && b.year === where.year && where.employeeId.in.includes(b.employeeId)),
     upsert: async ({ where, update, create }: any) => {
       const k = key(where); const b = db.balances.find((x) => x.employeeId === k.employeeId && x.leaveTypeId === k.leaveTypeId && x.year === k.year);
       if (b) Object.assign(b, update); else db.balances.push(create);

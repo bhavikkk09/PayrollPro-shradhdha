@@ -13,8 +13,21 @@ npm run web                                  # http://localhost:5173
 ```
 Docker: `JWT_SECRET=... docker compose up --build` (adds Postgres, Redis, daily backup job).
 
+## Backup & restore
+`docker compose up` runs a `backup` container that takes an immediate `pg_dump | gzip` on start, then every 24h, into `./backups/`, verifies each file with `gzip -t`, and deletes anything older than `RETENTION_DAYS` (default 14). Ship `./backups` off the host in production (object storage, another disk) — a backup that lives next to the database it protects does not survive a disk failure.
+
+**Restore** (stop the API first so nothing writes during the restore):
+```
+docker compose stop api
+gunzip -c backups/lcp_YYYYMMDD_HHMMSS.sql.gz | docker compose exec -T db psql -U lcp lcp
+docker compose start api
+```
+This replays SQL statements into the existing `lcp` database, so restoring into anything but an empty/matching schema can conflict; to restore into a clean database instead, drop and recreate it first (`docker compose exec db dropdb -U lcp lcp && docker compose exec db createdb -U lcp lcp`), then run the `gunzip | psql` line above.
+
+**Render's free Postgres has no built-in backups and expires after 90 days** — the Blueprint here does not run the `backup` container (Render's Docker web service only runs the API image). For real payroll data, either upgrade the Render database to a paid plan (which includes automated daily backups and point-in-time recovery), or schedule your own: copy the **External Database URL** from the Render Postgres dashboard and run `pg_dump "$EXTERNAL_URL" | gzip > lcp_$(date +%Y%m%d).sql.gz` from any machine with the Postgres client tools, on a cron job.
+
 ## Status
-Phases 1-9 done: auth/RBAC/company, employees, salary, attendance/leave/shift, payroll engine, compliance, reports/payslips, client portal, documents/notifications/audit log. Apply migrations with `npm run db:migrate` (0005 adds documents, notifications and the append-only audit trigger). Phase 10 (backup verification, deployment hardening) next.
+Phases 1-10 done: auth/RBAC/company, employees, salary, attendance/leave/shift, payroll engine, compliance, reports/payslips, client portal, documents/notifications/audit log, backup/Docker/deployment hardening. Apply migrations with `npm run db:migrate` (0005 adds documents, notifications and the append-only audit trigger; 0006 adds an index behind monthly leave accrual). See `docs/ARCHITECTURE.md` for what Phase 10 changed.
 
 ## Deploy on Render
 1. Push this repo to GitHub, then in Render choose **New > Blueprint** and select the repo (it reads `render.yaml`).

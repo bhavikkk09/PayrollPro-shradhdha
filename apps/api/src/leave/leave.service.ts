@@ -125,7 +125,12 @@ export class LeaveService {
     return { balance: bal };
   }
 
-  /** Idempotent monthly accrual: re-running the same month never double-credits. */
+  /**
+   * Idempotent monthly accrual: re-running the same month never double-credits.
+   * Balances for the whole policy are batch-read once and the writes for all employees are
+   * grouped into a handful of transactions, instead of one $transaction per employee - at
+   * 10k+ employees that used to mean tens of thousands of sequential round trips per run.
+   */
   async accrue(u: AuthUser, companyId: string, year: number, month: number, ip?: string) {
     const policies = await this.prisma.leavePolicy.findMany({ where: { companyId } });
     const monthEnd = ymd(dateKey(year, month, daysInMonth(year, month)));
@@ -134,6 +139,7 @@ export class LeaveService {
       where: { companyId, deletedAt: null, doj: { lte: monthEnd }, OR: [{ dol: null }, { dol: { gte: monthStart } }] }, select: { id: true },
     });
     const period = `${year}-${String(month).padStart(2, '0')}`;
+    const accrualDate = dateKey(year, month, 1);
     let credited = 0;
     for (const p of policies) {
       const rule = (p.accrualRule as { frequency?: string; perPeriod?: number } | null) ?? {};
@@ -143,16 +149,26 @@ export class LeaveService {
       if (!(amount > 0)) continue;
       const key = `accrual:${period}`;
       const done = new Set((await this.prisma.leaveTransaction.findMany({ where: { companyId, leaveTypeId: p.leaveTypeId, type: 'ACCRUAL', note: key }, select: { employeeId: true } })).map((x) => x.employeeId));
+      const pending = emps.filter((e) => !done.has(e.id));
+      if (!pending.length) continue;
       const cap = p.maxAccumulation == null ? null : n(p.maxAccumulation);
-      for (const e of emps) {
-        if (done.has(e.id)) continue;
-        await this.prisma.$transaction(async (tx) => {
-          const cur = await tx.leaveBalance.findUnique({ where: { employeeId_leaveTypeId_year: { employeeId: e.id, leaveTypeId: p.leaveTypeId, year } } });
-          const have = cur ? n(cur.balance) : 0;
-          const give = cap == null ? amount : Math.max(0, Math.min(amount, cap - have));
-          if (give > 0) { await this.post(tx, companyId, e.id, p.leaveTypeId, 'ACCRUAL', give, dateKey(year, month, 1), key, u.id); credited++; }
-        });
+      const bals = await this.prisma.leaveBalance.findMany({ where: { companyId, leaveTypeId: p.leaveTypeId, year, employeeId: { in: pending.map((e) => e.id) } } });
+      const balBy = new Map(bals.map((b) => [b.employeeId, n(b.balance)]));
+      const ops: Prisma.PrismaPromise<any>[] = [];
+      for (const e of pending) {
+        const have = balBy.get(e.id) ?? 0;
+        const give = cap == null ? amount : Math.max(0, Math.min(amount, cap - have));
+        if (!(give > 0)) continue;
+        const newBalance = r2(have + give);
+        ops.push(this.prisma.leaveTransaction.create({ data: { companyId, employeeId: e.id, leaveTypeId: p.leaveTypeId, type: 'ACCRUAL', days: give, date: ymd(accrualDate), note: key, createdBy: u.id } }));
+        ops.push(this.prisma.leaveBalance.upsert({
+          where: { employeeId_leaveTypeId_year: { employeeId: e.id, leaveTypeId: p.leaveTypeId, year } },
+          update: { balance: newBalance }, create: { companyId, employeeId: e.id, leaveTypeId: p.leaveTypeId, year, balance: newBalance },
+        }));
+        credited++;
       }
+      // Chunked so one policy's writes never sit in a single unbounded transaction at very large scale.
+      for (let i = 0; i < ops.length; i += 2000) await this.prisma.$transaction(ops.slice(i, i + 2000));
     }
     await this.audit.log({ userId: u.id, companyId, action: 'LEAVE_ACCRUED', module: 'leave', recordId: period, newValue: { credited }, ip });
     return { period, credited };

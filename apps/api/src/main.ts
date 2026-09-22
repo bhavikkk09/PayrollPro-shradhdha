@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
 import { static as serveStatic } from 'express';
+import compression from 'compression';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
@@ -16,6 +17,7 @@ async function bootstrap() {
   // Behind a proxy (Render, nginx) req.ip would be the proxy for everyone, so rate limits and audit IPs would be wrong.
   if (prod || process.env.TRUST_PROXY) app.set('trust proxy', 1);
   app.use(helmet());
+  app.use(compression()); // gzip JSON/JS/CSS responses; already-compressed types (PDF, xlsx, images) are left alone
   app.useBodyParser('json', { limit: '5mb' }); // attendance imports send up to 20k rows
   app.enableCors({ origin: (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(','), credentials: true });
   app.setGlobalPrefix('api/v1');
