@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { CalcMethod, dateKey, daysInMonth, monthSalaryDivisor } from '../attendance/attendance-summary';
@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/auth.types';
 import { CompanyAccessService } from '../common/company-access';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Adjustment, calculateEmployeePayroll, EmployeeInput, ENGINE_VERSION, EngineConfig, SalaryLineSnap } from './payroll-engine';
 import { pickRule, StatRule } from './statutory';
 
@@ -23,7 +24,12 @@ export interface Issue { employeeId: string; code: string; level: 'ERROR' | 'WAR
 @Injectable()
 export class PayrollService {
   private log = new Logger('Payroll');
-  constructor(private prisma: PrismaService, private audit: AuditService, private access: CompanyAccessService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private access: CompanyAccessService, @Optional() private notifications?: NotificationsService) {}
+
+  private tell(companyId: string, type: 'PAYROLL_APPROVED' | 'PAYROLL_LOCKED', run: { id: string; year: number; month: number }) {
+    const label = `${new Date(Date.UTC(run.year, run.month - 1, 1)).toLocaleString('en', { month: 'long', timeZone: 'UTC' })} ${run.year}`;
+    this.notifications?.safe(() => this.notifications!.notify(companyId, type, { title: type === 'PAYROLL_APPROVED' ? `Payroll for ${label} is approved` : `Payroll for ${label} is locked`, link: 'payroll', refKey: `${type.toLowerCase()}:${run.id}` }));
+  }
 
   // ───────── Runs ─────────
   listRuns(companyId: string, year?: number) {
@@ -247,6 +253,7 @@ export class PayrollService {
       }
       await tx.payrollRun.update({ where: { id }, data: { status: 'APPROVED', approvedBy: u.id, approvedAt: new Date() } });
     }, { timeout: 60_000 });
+    this.tell(companyId, 'PAYROLL_APPROVED', run);
     await this.audit.log({ userId: u.id, companyId, action: 'PAYROLL_APPROVED', module: 'payroll', recordId: id, oldValue: { status: 'REVIEW' }, newValue: { status: 'APPROVED', totalNet: n(run.totalNet), skipped: errs.length }, ip });
     return { ok: true };
   }
@@ -265,7 +272,11 @@ export class PayrollService {
     return { ok: true };
   }
 
-  lock(u: AuthUser, c: string, id: string, ip?: string) { return this.move(u, c, id, ['APPROVED'], 'LOCKED', 'PAYROLL_LOCKED', { lockedBy: u.id, lockedAt: new Date() }, undefined, ip); }
+  async lock(u: AuthUser, c: string, id: string, ip?: string) {
+    const r = await this.move(u, c, id, ['APPROVED'], 'LOCKED', 'PAYROLL_LOCKED', { lockedBy: u.id, lockedAt: new Date() }, undefined, ip);
+    this.tell(c, 'PAYROLL_LOCKED', r);
+    return r;
+  }
 
   /** Requires payroll.unlock (checked on the route) and a written reason; always audited. */
   async unlock(u: AuthUser, companyId: string, id: string, reason: string, ip?: string) {

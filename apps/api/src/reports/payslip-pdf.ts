@@ -13,6 +13,7 @@ export interface PayslipData {
   earnings: { name: string; amount: number }[];
   deductions: { name: string; amount: number }[];
   gross: number; totalDeductions: number; net: number;
+  logo?: Buffer; // PNG or JPEG
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -23,7 +24,11 @@ function slip(doc: PDFKit.PDFDocument, p: PayslipData, b: Branding) {
 
   // header band
   doc.rect(0, 0, doc.page.width, 78).fill(color);
-  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text(latin(p.company.name), m, 20, { width: W });
+  if (p.logo) {
+    try { doc.roundedRect(m + W - 100, 12, 100, 54, 4).fill('#ffffff'); doc.image(p.logo, m + W - 96, 16, { fit: [92, 46], align: 'center', valign: 'center' }); }
+    catch { /* a corrupt logo must not break the payslip */ }
+  }
+  doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(16).text(latin(p.company.name), m, 20, { width: p.logo ? W - 110 : W });
   doc.font('Helvetica').fontSize(8.5).text(latin(p.company.address || ''), m, 44, { width: W });
   doc.fillColor('#0f172a').font('Helvetica-Bold').fontSize(12).text(`${latin(b.title || 'PAYSLIP')} - ${latin(p.period)}`, m, 92);
 

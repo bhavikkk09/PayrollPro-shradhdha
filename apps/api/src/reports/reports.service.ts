@@ -1,10 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AttendanceService } from '../attendance/attendance.service';
 import { dateKey, daysInMonth, weekday } from '../attendance/attendance-summary';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/auth.types';
 import { decrypt, mask } from '../common/crypto';
+import { FileStorage } from '../files/storage';
 import { toStatRule } from '../compliance/compliance.service';
 import { pickRule } from '../payroll/statutory';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,12 +49,12 @@ export interface Query { kind: Kind; year: number; month: number; employeeId?: s
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService, private audit: AuditService, private attendance: AttendanceService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private attendance: AttendanceService, @Optional() private storage?: FileStorage) {}
 
   catalog() { return CATALOG; }
 
   private async company(companyId: string) {
-    const c = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { code: true, name: true, address: true, city: true, state: true, pincode: true, consultantId: true } });
+    const c = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId }, select: { code: true, name: true, address: true, city: true, state: true, pincode: true, consultantId: true, logoUrl: true } });
     return { ...c, fullAddress: [c.address, c.city, c.state, c.pincode].filter(Boolean).join(', ') };
   }
 
@@ -239,6 +240,7 @@ export class ReportsService {
       },
     });
     if (!details.length) throw new NotFoundException(employeeId ? 'No payslip for this employee in this run' : 'This run has no calculated payslips');
+    const logo = c.logoUrl?.startsWith('blob:') && this.storage ? (await this.storage.get(c.logoUrl.slice(5))) ?? undefined : undefined;
     const divisor = ((run.rulesSnapshot as any)?.divisor as number | undefined) ?? daysInMonth(run.year, run.month);
     const list: PayslipData[] = details.map((d) => {
       const acct = decrypt(d.employee.bankAccountEnc);
@@ -248,7 +250,7 @@ export class ReportsService {
           bank: [d.employee.bankName, acct ? mask(acct) : ''].filter(Boolean).join(' '), uan: d.employee.uan ?? '', pfNumber: d.employee.pfNumber ?? '', esiNumber: d.employee.esiNumber ?? '' },
         attendance: { workingDays: divisor, paidDays: n(d.paidDays), lopDays: n(d.lopDays), otHours: n(d.otHours) },
         earnings: d.earnings.map((e) => ({ name: e.name, amount: n(e.amount) })), deductions: d.deductions.map((e) => ({ name: e.name, amount: n(e.amount) })),
-        gross: n(d.gross), totalDeductions: n(d.totalDeductions), net: n(d.net),
+        gross: n(d.gross), totalDeductions: n(d.totalDeductions), net: n(d.net), logo,
       };
     });
     const pdf = await payslipsPdf(list, (settings?.branding as Branding | null) ?? {});

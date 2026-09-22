@@ -933,6 +933,10 @@ model ComplianceDocument {
   taskId    String
   fileKey   String
   fileName  String
+  mimeType  String  @default("application/octet-stream")
+  sizeBytes Int     @default(0)
+  uploadedBy String?
+  createdAt DateTime @default(now())
   task      ComplianceTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
@@ -1020,7 +1024,17 @@ model Notification {
   link      String?
   readAt    DateTime?
   createdAt DateTime         @default(now())
+  dedupeKey String?          @unique // makes scheduled reminders idempotent (one per user per event)
 
   @@index([userId, readAt])
   @@index([companyId])
+}
+
+// File contents. Kept in the database so uploads survive redeploys on hosts with ephemeral disks.
+// Swap the FileStorage adapter for S3/GCS/Azure without touching callers.
+model FileBlob {
+  key       String   @id
+  data      Bytes
+  size      Int
+  createdAt DateTime @default(now())
 }

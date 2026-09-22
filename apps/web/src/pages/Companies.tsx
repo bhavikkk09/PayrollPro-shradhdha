@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Plus, X } from 'lucide-react';
-import { api, type Session } from '../api';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Plus, Trash2, Upload, X } from 'lucide-react';
+import { api, fetchImageUrl, uploadFile, type Session } from '../api';
 import { Badge, Empty, ErrorBox } from '../components/ui';
 
 export interface Company {
   id: string; code: string; name: string; city?: string | null; state?: string | null; status: string;
   legalName?: string | null; gstin?: string | null; pan?: string | null; email?: string | null; phone?: string | null;
-  settings?: Settings | null; _count?: { employees: number };
+  logoUrl?: string | null; settings?: Settings | null; _count?: { employees: number };
 }
 type Settings = Record<string, boolean | string | number | null>;
 
@@ -95,6 +95,7 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
   const [form, setForm] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<Settings>({ shiftEnabled: false });
   const [brand, setBrand] = useState({ primaryColor: '#1e293b', footerText: '', title: '' });
+  const [hasLogo, setHasLogo] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -103,7 +104,7 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
     api<Company>(`/companies/${target.id}`).then((c) => {
       const f: Record<string, string> = {};
       TEXT.forEach(([k]) => { f[k] = String((c as unknown as Record<string, unknown>)[k] ?? ''); });
-      setForm(f); setSettings(c.settings ?? {});
+      setForm(f); setSettings(c.settings ?? {}); setHasLogo(!!c.logoUrl);
       const b = (c.settings as { branding?: Partial<typeof brand> } | null | undefined)?.branding;
       if (b) setBrand({ primaryColor: b.primaryColor ?? '#1e293b', footerText: b.footerText ?? '', title: b.title ?? '' });
     }).catch((e) => setErr(e.message));
@@ -179,6 +180,7 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
               <label>Title<input className="block mt-1 border rounded-md px-2 py-1.5 text-sm text-slate-900 w-40" placeholder="PAYSLIP" disabled={!canSettings} value={brand.title} onChange={(e) => setBrand({ ...brand, title: e.target.value })} /></label>
               <label className="flex-1 min-w-48">Footer note<input className="block mt-1 w-full border rounded-md px-2 py-1.5 text-sm text-slate-900" disabled={!canSettings} value={brand.footerText} onChange={(e) => setBrand({ ...brand, footerText: e.target.value })} /></label>
             </div>
+            {canSettings && <LogoUpload companyId={target.mode === 'edit' ? target.id : ''} hasLogo={hasLogo} onChange={setHasLogo} onError={setErr} />}
           </div>
         )}
 
@@ -186,6 +188,47 @@ function CompanyDrawer({ target, canEdit, canSettings, onClose, onSaved }: {
           <button disabled={busy} className="bg-slate-900 text-white rounded-md px-4 py-2 text-sm disabled:opacity-60">{busy ? 'Saving…' : 'Save'}</button>
         )}
       </form>
+    </div>
+  );
+}
+
+function LogoUpload({ companyId, hasLogo, onChange, onError }: { companyId: string; hasLogo: boolean; onChange: (v: boolean) => void; onError: (m: string) => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let obj: string | null = null;
+    if (companyId && hasLogo) fetchImageUrl(`/companies/${companyId}/logo`).then((u) => { obj = u; setUrl(u); }).catch(() => setUrl(null));
+    else setUrl(null);
+    return () => { if (obj) URL.revokeObjectURL(obj); };
+  }, [companyId, hasLogo]);
+
+  const pick = async (file: File | undefined) => {
+    if (!file || !companyId) return;
+    setBusy(true); onError('');
+    try { await uploadFile(`/companies/${companyId}/logo`, file); onChange(true); }
+    catch (x) { onError(x instanceof Error ? x.message : 'Upload failed'); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+  const remove = async () => {
+    if (!companyId || !confirm('Remove the company logo?')) return;
+    onError('');
+    try { await api(`/companies/${companyId}/logo`, { method: 'DELETE' }); onChange(false); }
+    catch (x) { onError(x instanceof Error ? x.message : 'Failed'); }
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className="text-xs text-slate-600">Logo (shown on payslips)</div>
+      <div className="w-16 h-16 border rounded-md bg-slate-50 grid place-items-center overflow-hidden">
+        {url ? <img src={url} alt="Company logo" className="max-w-full max-h-full object-contain" /> : <span className="text-[10px] text-slate-400">None</span>}
+      </div>
+      <label className="flex items-center gap-1 border rounded-md px-3 py-1.5 text-sm bg-white cursor-pointer">
+        <Upload size={14} /> {busy ? 'Uploading…' : 'Upload'}
+        <input ref={fileRef} type="file" className="hidden" accept=".png,.jpg,.jpeg" disabled={busy || !companyId} onChange={(e) => pick(e.target.files?.[0])} />
+      </label>
+      {hasLogo && <button type="button" onClick={remove} aria-label="Remove logo" className="text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>}
     </div>
   );
 }

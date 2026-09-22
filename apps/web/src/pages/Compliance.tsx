@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Paperclip, Trash2, X } from 'lucide-react';
 import { api, type Session } from '../api';
+import DocumentsPanel from '../components/DocumentsPanel';
 import { Badge, Empty, ErrorBox } from '../components/ui';
 import { money } from './Salary';
 
@@ -40,6 +41,7 @@ function Calendar({ companyId, session }: { companyId: string; session: Session 
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [assign, setAssign] = useState<{ task: string; users: { id: string; name: string }[] } | null>(null);
+  const [files, setFiles] = useState<{ id: string; name: string } | null>(null);
   const can = session.user.permissions.includes('compliance.manage');
 
   const load = useCallback(() => {
@@ -92,6 +94,7 @@ function Calendar({ companyId, session }: { companyId: string; session: Session 
                 <td className="px-4 py-2">{t.assignedName ?? '—'}</td>
                 <td className="px-4 py-2 text-xs">{t.completedAt ? `${t.completedAt.slice(0, 10)}${t.challanRef ? ` · ${t.challanRef}` : ''}` : '—'}</td>
                 <td className="px-4 py-2 text-right whitespace-nowrap space-x-2">
+                  <button className="text-slate-500 inline-flex items-center gap-0.5" title="Attachments" onClick={() => setFiles({ id: t.id, name: t.name })}><Paperclip size={14} /></button>
                   {can && t.status !== 'COMPLETED' && <><button className="text-slate-600" onClick={() => openAssign(t)}>Assign</button><button className="text-emerald-700" onClick={() => complete(t)}>Complete</button></>}
                   {can && t.status === 'COMPLETED' && <button className="text-slate-500" onClick={() => wrap(() => api(`/compliance/tasks/${t.id}/reopen`, { method: 'POST' }))}>Reopen</button>}
                 </td>
@@ -108,6 +111,15 @@ function Calendar({ companyId, session }: { companyId: string; session: Session 
             <h2 className="font-semibold">Assign to</h2>
             <button className="block w-full text-left px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-50" onClick={() => wrap(() => api(`/compliance/tasks/${assign.task}/assign`, { method: 'POST', body: JSON.stringify({}) })).then(() => setAssign(null))}>Unassigned</button>
             {assign.users.map((u) => <button key={u.id} className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50" onClick={() => wrap(() => api(`/compliance/tasks/${assign.task}/assign`, { method: 'POST', body: JSON.stringify({ userId: u.id }) })).then(() => setAssign(null))}>{u.name}</button>)}
+          </div>
+        </div>
+      )}
+
+      {files && (
+        <div className="fixed inset-0 z-30 bg-black/30 grid place-items-center p-4" onClick={() => setFiles(null)}>
+          <div className="bg-white rounded-xl p-5 w-full max-w-2xl max-h-[85vh] overflow-y-auto space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center"><h2 className="font-semibold">Attachments · {files.name}</h2><button onClick={() => setFiles(null)} className="ml-auto" aria-label="Close"><X size={18} /></button></div>
+            <DocumentsPanel basePath={`/compliance/tasks/${files.id}/documents`} kind="task" canManage={can} showExpiry={false} />
           </div>
         </div>
       )}

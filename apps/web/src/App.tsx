@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Building2, LayoutDashboard, LogOut, Users, Network, Coins, CalendarCheck, CalendarOff, Clock, Wallet, Layers, Scale, ShieldCheck, FileText, Menu, KeyRound, UserCog } from 'lucide-react';
+import { Building2, LayoutDashboard, LogOut, Users, Network, Coins, CalendarCheck, CalendarOff, Clock, Wallet, Layers, Scale, ShieldCheck, FileText, Menu, KeyRound, UserCog, FolderOpen, History } from 'lucide-react';
 import { api, getSession, setSession, type Session } from './api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -8,6 +8,8 @@ import ChangePassword from './pages/ChangePassword';
 import UsersPage from './pages/Users';
 import Employees from './pages/Employees';
 import Reports from './pages/Reports';
+import Documents from './pages/Documents';
+import AuditLog from './pages/AuditLog';
 import Compliance from './pages/Compliance';
 import ComplianceRules from './pages/ComplianceRules';
 import Payroll from './pages/Payroll';
@@ -18,8 +20,10 @@ import Shifts from './pages/Shifts';
 import Salary from './pages/Salary';
 import Organisation from './pages/Organisation';
 import Companies, { type Company } from './pages/Companies';
+import NotificationsBell from './components/NotificationsBell';
 
-type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts' | 'payroll' | 'bulk' | 'compliance' | 'rules' | 'reports' | 'users';
+type Page = 'dashboard' | 'companies' | 'employees' | 'organisation' | 'salary' | 'attendance' | 'leave' | 'shifts' | 'payroll' | 'bulk' | 'compliance' | 'rules' | 'reports' | 'documents' | 'users' | 'audit';
+const PAGES: Page[] = ['dashboard', 'companies', 'employees', 'organisation', 'salary', 'attendance', 'leave', 'shifts', 'payroll', 'bulk', 'compliance', 'rules', 'reports', 'documents', 'users', 'audit'];
 
 // `internal` items exist only for the consultant firm; `perm` hides items the user could not use anyway.
 const NAV: { key: Page; label: string; icon: typeof Users; perm?: string; internal?: boolean }[] = [
@@ -36,7 +40,9 @@ const NAV: { key: Page; label: string; icon: typeof Users; perm?: string; intern
   { key: 'compliance', label: 'Compliance', icon: ShieldCheck, perm: 'compliance.view' },
   { key: 'rules', label: 'Compliance rules', icon: Scale, perm: 'compliance.view', internal: true },
   { key: 'reports', label: 'Reports', icon: FileText, perm: 'reports.view' },
+  { key: 'documents', label: 'Documents', icon: FolderOpen, perm: 'documents.view' },
   { key: 'users', label: 'Users', icon: UserCog, perm: 'users.manage', internal: true },
+  { key: 'audit', label: 'Audit log', icon: History, perm: 'audit.view', internal: true },
 ];
 
 export default function App() {
@@ -108,6 +114,7 @@ export default function App() {
             </>
           ) : <span className="text-sm text-slate-600">{companies[0]?.name}</span>}
           <div className="ml-auto flex items-center gap-3 text-sm">
+            <NotificationsBell onNavigate={(p) => { if ((PAGES as string[]).includes(p)) setPage(p as Page); }} />
             <span className="hidden sm:block text-slate-600">{session.user.name}</span>
             <button onClick={() => setPwDialog(true)} className="flex items-center gap-1 text-slate-600 hover:text-slate-900" title="Change password"><KeyRound size={16} /><span className="hidden sm:inline">Password</span></button>
             <button onClick={logout} className="flex items-center gap-1 text-slate-600 hover:text-slate-900"><LogOut size={16} /> Sign out</button>
@@ -121,10 +128,12 @@ export default function App() {
           {page === 'rules' && !isClient && <ComplianceRules session={session} />}
           {page === 'bulk' && !isClient && <BulkPayroll companies={companies} session={session} />}
           {page === 'users' && !isClient && <UsersPage companies={companies} session={session} />}
+          {page === 'audit' && !isClient && <AuditLog companies={companies} />}
           {page === 'compliance' && <Compliance key={key} companyId={companyId} session={session} />}
           {page === 'salary' && scoped(<Salary key={key} companyId={companyId} session={session} />)}
           {page === 'employees' && scoped(<Employees key={key} companyId={companyId} session={session} />)}
           {page === 'reports' && scoped(<Reports key={key} companyId={companyId} session={session} />)}
+          {page === 'documents' && scoped(<Documents key={key} companyId={companyId} session={session} />)}
           {page === 'payroll' && scoped(<Payroll key={key} companyId={companyId} session={session} />)}
           {page === 'attendance' && scoped(<Attendance key={key} companyId={companyId} session={session} />)}
           {page === 'leave' && scoped(<Leave key={key} companyId={companyId} session={session} />)}

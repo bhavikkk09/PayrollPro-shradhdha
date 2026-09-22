@@ -14,8 +14,7 @@ npm run web                                  # http://localhost:5173
 Docker: `JWT_SECRET=... docker compose up --build` (adds Postgres, Redis, daily backup job).
 
 ## Status
-Phase 1 done: auth, RBAC, company master + settings (shift OFF by default), dashboard, audit log, tenant isolation tests.
-Phases 1-8 done. Apply migrations with `npm run db:migrate` (0004 adds the temporary-password flag). Phases 9-10 next.
+Phases 1-9 done: auth/RBAC/company, employees, salary, attendance/leave/shift, payroll engine, compliance, reports/payslips, client portal, documents/notifications/audit log. Apply migrations with `npm run db:migrate` (0005 adds documents, notifications and the append-only audit trigger). Phase 10 (backup verification, deployment hardening) next.
 
 ## Deploy on Render
 1. Push this repo to GitHub, then in Render choose **New > Blueprint** and select the repo (it reads `render.yaml`).

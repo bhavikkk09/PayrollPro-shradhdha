@@ -1,7 +1,8 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { AttendanceStatus, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/auth.types';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { validateAttendanceRows, RawRow, ValidRow } from './attendance-import';
 import { CalcMethod, dateKey, daysInMonth, MonthSummary, Status, summarizeMonth } from './attendance-summary';
@@ -13,7 +14,7 @@ export interface Entry { employeeId: string; date: string; status: Status; otHou
 
 @Injectable()
 export class AttendanceService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, @Optional() private notifications?: NotificationsService) {}
 
   async settings(companyId: string) {
     const s = await this.prisma.companySettings.findUnique({ where: { companyId } });
@@ -137,6 +138,7 @@ export class AttendanceService {
         stagedData: usable as any, createdBy: u.id,
       },
     });
+    if (errors.length) this.notifications?.safe(() => this.notifications!.notifyUser(u.id, companyId, 'IMPORT_ERROR', { title: `Attendance import has ${errors.length} error${errors.length === 1 ? '' : 's'}`, body: fileName.slice(0, 100), link: 'attendance' }));
     return {
       jobId: job.id, totalRows: rows.length, validRows: usable.length, errorRows: errors.length, errors: allErrors.slice(0, 200),
       preview: usable.slice(0, 20), months,

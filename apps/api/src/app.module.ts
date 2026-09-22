@@ -18,6 +18,13 @@ import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
 import { UsersController } from './users/users.controller';
 import { UsersService } from './users/users.service';
+import { DocumentsController, TaskDocumentsController } from './files/documents.controller';
+import { DocumentsService } from './files/documents.service';
+import { TaskAccess } from './files/task-access';
+import { StorageModule } from './files/storage';
+import { NotificationsController, NotificationsScheduler } from './notifications/notifications.controller';
+import { NotificationsService } from './notifications/notifications.service';
+import { AuditController, AuditQueryService } from './audit/audit.controller';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { CompanyAccessGuard, CompanyAccessService } from './common/company-access';
@@ -47,10 +54,11 @@ import { PrismaModule } from './prisma/prisma.service';
     }),
     PrismaModule,
     AuditModule,
+    StorageModule,
   ],
-  controllers: [HealthController, AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController, AttendanceController, LeaveController, ShiftController, PayrollController, BulkPayrollController, ComplianceController, CompanyComplianceController, ReportsController, UsersController],
+  controllers: [HealthController, AuthController, CompaniesController, DashboardController, OrgController, EmployeesController, SalaryController, AttendanceController, LeaveController, ShiftController, PayrollController, BulkPayrollController, ComplianceController, CompanyComplianceController, ReportsController, UsersController, DocumentsController, TaskDocumentsController, NotificationsController, AuditController],
   providers: [
-    AuthService, CompaniesService, EmployeesService, SalaryService, AttendanceService, LeaveService, PayrollService, ComplianceService, ReportsService, UsersService, CompanyAccessService, CompanyAccessGuard,
+    AuthService, CompaniesService, EmployeesService, SalaryService, AttendanceService, LeaveService, PayrollService, ComplianceService, ReportsService, UsersService, DocumentsService, TaskAccess, NotificationsService, NotificationsScheduler, AuditQueryService, CompanyAccessService, CompanyAccessGuard,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

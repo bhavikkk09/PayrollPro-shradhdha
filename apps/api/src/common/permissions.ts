@@ -21,7 +21,7 @@ export const ROLE_MATRIX: Record<string, { name: string; permissions: Permission
   CONSULTANT_STAFF: {
     name: 'Consultant Staff',
     permissions: ALL.filter(
-      (p) => !['company.delete', 'users.manage', 'settings.manage', 'payroll.unlock', 'compliance.config', 'employee.delete', 'employee.sensitive'].includes(p),
+      (p) => !['company.delete', 'users.manage', 'settings.manage', 'payroll.unlock', 'compliance.config', 'employee.delete', 'employee.sensitive', 'audit.view'].includes(p),
     ),
   },
   CLIENT_ADMIN: {

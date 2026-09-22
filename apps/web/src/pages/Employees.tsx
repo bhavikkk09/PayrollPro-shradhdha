@@ -3,6 +3,7 @@ import { Eye, Plus, X } from 'lucide-react';
 import { api, type Session } from '../api';
 import { Badge, Empty, ErrorBox } from '../components/ui';
 import EmployeeSalary from '../components/EmployeeSalary';
+import DocumentsPanel from '../components/DocumentsPanel';
 
 interface Emp {
   id: string; code: string; firstName: string; middleName?: string | null; lastName?: string | null; status: string;
@@ -204,6 +205,12 @@ function EmployeeDrawer({ companyId, id, can, onClose, onSaved }: {
           </section>
         ))}
         {id && can('salary.view') && <EmployeeSalary companyId={companyId} employeeId={id} canManage={can('salary.manage')} />}
+        {id && can('documents.view') && (
+          <section className="space-y-2">
+            <h3 className="text-sm font-medium">Documents</h3>
+            <DocumentsPanel basePath={`/companies/${companyId}/employees/${id}/documents`} kind="employee" canManage={can('documents.manage')} />
+          </section>
+        )}
         {!readOnly && <button disabled={busy} className="bg-slate-900 text-white rounded-md px-4 py-2 text-sm disabled:opacity-60">{busy ? 'Saving…' : 'Save'}</button>}
       </form>
     </div>

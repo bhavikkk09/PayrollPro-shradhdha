@@ -1,8 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Employee, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/auth.types';
 import { decrypt, encrypt, mask } from '../common/crypto';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const REF_FIELDS = [
@@ -14,7 +15,7 @@ export interface ListQuery { search?: string; status?: string; branchId?: string
 
 @Injectable()
 export class EmployeesService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, @Optional() private notifications?: NotificationsService) {}
 
   async list(companyId: string, q: ListQuery) {
     const s = q.search?.trim();
@@ -50,6 +51,7 @@ export class EmployeesService {
     try {
       const e = await this.prisma.employee.create({ data: this.toData(dto, companyId) as Prisma.EmployeeUncheckedCreateInput });
       await this.audit.log({ userId: u.id, companyId, action: 'EMPLOYEE_CREATED', module: 'employee', recordId: e.id, newValue: this.present(e, false), ip });
+      this.notifications?.safe(() => this.notifications!.notify(companyId, 'EMPLOYEE_JOINING', { title: `New employee joined: ${e.code} ${e.firstName}`, link: 'employees', refKey: `emp-join:${e.id}` }));
       return this.present(e, false);
     } catch (x: any) {
       if (x.code === 'P2002') throw new ConflictException('Employee code already exists in this company');
@@ -68,6 +70,7 @@ export class EmployeesService {
         userId: u.id, companyId, action: 'EMPLOYEE_UPDATED', module: 'employee', recordId: id,
         oldValue: this.present(old, false), newValue: this.present(e, false), ip,
       });
+      if ((e.status === 'LEFT' && old.status !== 'LEFT') || (e.dol && !old.dol)) this.notifications?.safe(() => this.notifications!.notify(companyId, 'EMPLOYEE_LEAVING', { title: `Employee leaving: ${e.code} ${e.firstName}`, link: 'employees', refKey: `emp-leave:${e.id}` }));
       return this.present(e, false);
     } catch (x: any) {
       if (x.code === 'P2002') throw new ConflictException('Employee code already exists in this company');
