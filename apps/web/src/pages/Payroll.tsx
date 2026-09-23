@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { ListChecks, Trash2, X } from 'lucide-react';
 import { api, download, type Session } from '../api';
 import EmployeePicker, { type EmpLite } from '../components/EmployeePicker';
+import QuickImportModal from '../components/QuickImportModal';
 import { Badge, Card, Empty, ErrorBox } from '../components/ui';
 import { money } from './Salary';
 
@@ -35,6 +36,7 @@ export default function Payroll({ companyId, session }: { companyId: string; ses
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [drawer, setDrawer] = useState<string | null>(null);
+  const [quickImport, setQuickImport] = useState(false);
   const can = (p: string) => session.user.permissions.includes(p);
   const pageSize = 50;
 
@@ -99,7 +101,14 @@ export default function Payroll({ companyId, session }: { companyId: string; ses
       {run === null && (
         <div className="bg-white border rounded-xl p-6 space-y-3">
           <p className="text-sm text-slate-600">No payroll run for this month yet. Before starting, make sure attendance is finalized and salary is assigned.</p>
-          {can('payroll.process') && <button disabled={busy} onClick={create} className={`${btn} bg-slate-900 text-white`}>Create payroll run</button>}
+          <div className="flex flex-wrap gap-2">
+            {can('payroll.process') && <button disabled={busy} onClick={create} className={`${btn} bg-slate-900 text-white`}>Create payroll run</button>}
+            {can('attendance.manage') && (
+              <button disabled={busy} onClick={() => setQuickImport(true)} className={`${btn} flex items-center gap-1 border bg-white`} title="Just have total days worked per employee, not a daily register? Use this instead.">
+                <ListChecks size={14} /> Quick import (days worked)
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -111,6 +120,11 @@ export default function Payroll({ companyId, session }: { companyId: string; ses
             </ol>
             <div className="ml-auto flex flex-wrap gap-2">
               {can('reports.export') && (run._count?.details ?? 0) > 0 && <button disabled={busy} onClick={() => dl(`/companies/${companyId}/payslips/${run.id}`)} className={`${btn} border bg-white`}>Payslips (PDF)</button>}
+              {can('attendance.manage') && st === 'DRAFT' && (
+                <button disabled={busy} onClick={() => setQuickImport(true)} className={`${btn} flex items-center gap-1 border bg-white`} title="Just have total days worked per employee, not a daily register? Use this instead.">
+                  <ListChecks size={14} /> Quick import (days worked)
+                </button>
+              )}
               {can('payroll.process') && (st === 'DRAFT' || st === 'CALCULATED' || st === 'REVIEW') && <button disabled={busy} onClick={() => act(`runs/${run.id}/process`)} className={`${btn} ${st === 'DRAFT' ? 'bg-slate-900 text-white' : 'border bg-white'}`}>{st === 'DRAFT' ? 'Calculate payroll' : 'Recalculate'}</button>}
               {can('payroll.process') && st === 'CALCULATED' && <button disabled={busy} onClick={() => act(`runs/${run.id}/review`)} className={`${btn} bg-slate-900 text-white`}>Send to review</button>}
               {can('payroll.process') && st === 'REVIEW' && <button disabled={busy} onClick={() => act(`runs/${run.id}/back-to-calculated`)} className={`${btn} border bg-white`}>Back to calculated</button>}
@@ -182,6 +196,7 @@ export default function Payroll({ companyId, session }: { companyId: string; ses
       )}
 
       {run && drawer && <DetailDrawer companyId={companyId} runId={run.id} employeeId={drawer} canPdf={can('reports.export')} onClose={() => setDrawer(null)} />}
+      {quickImport && <QuickImportModal companyId={companyId} year={year} month={month} onClose={() => setQuickImport(false)} onDone={() => { setQuickImport(false); loadRun(); }} />}
     </div>
   );
 }

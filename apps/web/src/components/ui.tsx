@@ -30,3 +30,14 @@ export const Empty = ({ text }: { text: string }) => <div className="text-sm tex
 export const ErrorBox = ({ text }: { text: string }) => (
   <div role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">{text}</div>
 );
+
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-30 bg-black/30 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex"><h2 className="font-semibold">{title}</h2><button onClick={onClose} className="ml-auto text-slate-500">Close</button></div>
+        {children}
+      </div>
+    </div>
+  );
+}
