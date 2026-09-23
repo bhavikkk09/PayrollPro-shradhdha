@@ -168,7 +168,7 @@ export class SalaryService {
         code: c.code, name: c.name, type: c.type, calcMethod: method, sequence: i.sequence,
         percentage: num(i.percentage) ?? num(c.percentage), percentOf: i.percentOf ?? c.percentOf,
         fixedAmount: num(i.fixedAmount) ?? num(c.fixedAmount), formula: i.formula ?? c.formula,
-        flags: { pf: c.pfApplicable, esi: c.esiApplicable, pt: c.ptApplicable, bonus: c.bonusApplicable, gratuity: c.gratuityApplicable, taxable: c.taxable },
+        flags: { pf: c.pfApplicable, esi: c.esiApplicable, pt: c.ptApplicable, bonus: c.bonusApplicable, gratuity: c.gratuityApplicable, taxable: c.taxable, prorateByAttendance: c.prorateByAttendance },
       };
     });
   }

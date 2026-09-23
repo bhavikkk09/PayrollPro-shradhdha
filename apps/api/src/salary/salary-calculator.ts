@@ -13,7 +13,7 @@ export interface CalcItem {
   flags?: LineFlags; // statutory applicability, copied from the component
 }
 
-export interface LineFlags { pf: boolean; esi: boolean; pt: boolean; bonus: boolean; gratuity: boolean; taxable: boolean }
+export interface LineFlags { pf: boolean; esi: boolean; pt: boolean; bonus: boolean; gratuity: boolean; taxable: boolean; prorateByAttendance: boolean }
 /** HOURLY components (overtime): amount = otHours x (base / divisor / hoursPerDay) x multiplier, computed at payroll time. */
 export interface HourlyParams { percentOf: string; multiplier: number; hoursPerDay: number }
 

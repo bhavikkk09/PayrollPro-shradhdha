@@ -23,6 +23,7 @@ class ComponentDto {
   @IsOptional() @IsBoolean() ptApplicable?: boolean;
   @IsOptional() @IsBoolean() bonusApplicable?: boolean;
   @IsOptional() @IsBoolean() gratuityApplicable?: boolean;
+  @IsOptional() @IsBoolean() prorateByAttendance?: boolean;
   @IsOptional() @IsIn(METHODS) calcMethod?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(1000) percentage?: number;
   @IsOptional() @Matches(/^[A-Z][A-Z0-9_]{0,19}$/) percentOf?: string;

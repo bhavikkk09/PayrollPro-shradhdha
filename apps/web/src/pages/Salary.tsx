@@ -6,6 +6,7 @@ import { Badge, Empty, ErrorBox } from '../components/ui';
 export interface Component {
   id: string; code: string; name: string; type: string; calcMethod: string; percentage?: string | number | null;
   percentOf?: string | null; fixedAmount?: string | number | null; formula?: string | null; effectiveFrom: string; active: boolean;
+  prorateByAttendance: boolean;
 }
 interface StructureRow { id: string; name: string; active: boolean; _count: { items: number; employeeSalaries: number } }
 interface StructureFull { id: string; name: string; items: { componentId: string; sequence: number; component: Component }[] }
@@ -16,6 +17,7 @@ export interface CalcResult {
 
 export const money = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const FLAGS: [string, string][] = [['taxable', 'Taxable'], ['pfApplicable', 'PF'], ['esiApplicable', 'ESI'], ['ptApplicable', 'PT'], ['bonusApplicable', 'Bonus'], ['gratuityApplicable', 'Gratuity']];
+const PRORATE_FLAG: [string, string] = ['prorateByAttendance', 'Prorate by attendance'];
 
 export default function Salary({ companyId, session }: { companyId: string; session: Session }) {
   const [tab, setTab] = useState<'components' | 'structures'>('components');
@@ -35,7 +37,7 @@ export default function Salary({ companyId, session }: { companyId: string; sess
 
 function Components({ companyId, canManage }: { companyId: string; canManage: boolean }) {
   const [rows, setRows] = useState<Component[]>([]);
-  const [form, setForm] = useState<Record<string, string | boolean>>({ type: 'EARNING', calcMethod: 'FIXED', taxable: true });
+  const [form, setForm] = useState<Record<string, string | boolean>>({ type: 'EARNING', calcMethod: 'FIXED', taxable: true, prorateByAttendance: true });
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -55,7 +57,7 @@ function Components({ companyId, canManage }: { companyId: string; canManage: bo
         else if (v.trim() !== '') b[k] = ['percentage', 'fixedAmount'].includes(k) ? Number(v) : v;
       }
       await api(`/companies/${companyId}/salary-components`, { method: 'POST', body: JSON.stringify(b) });
-      setForm({ type: 'EARNING', calcMethod: 'FIXED', taxable: true }); load();
+      setForm({ type: 'EARNING', calcMethod: 'FIXED', taxable: true, prorateByAttendance: true }); load();
     } catch (x) { setErr(x instanceof Error ? x.message : 'Failed'); }
   };
   const del = async (id: string) => {
@@ -93,6 +95,9 @@ function Components({ companyId, canManage }: { companyId: string; canManage: bo
           </div>
           <div className="flex flex-wrap gap-4 text-sm items-center">
             {FLAGS.map(([k, l]) => <label key={k} className="flex items-center gap-1"><input type="checkbox" checked={!!form[k]} onChange={(e) => set(k, e.target.checked)} /> {l}</label>)}
+            <label className="flex items-center gap-1 border-l pl-4" title="Unchecked: this component always pays its full amount, regardless of days worked/LOP">
+              <input type="checkbox" checked={!!form[PRORATE_FLAG[0]]} onChange={(e) => set(PRORATE_FLAG[0], e.target.checked)} /> {PRORATE_FLAG[1]}
+            </label>
             <button className="ml-auto bg-slate-900 text-white rounded-md px-4 py-1.5 text-sm">Add component</button>
           </div>
         </form>
@@ -105,7 +110,7 @@ function Components({ companyId, canManage }: { companyId: string; canManage: bo
               <tr key={c.id} className="border-t">
                 <td className="px-4 py-2 font-mono">{c.code}</td><td className="px-4 py-2">{c.name}</td>
                 <td className="px-4 py-2">{c.type.replace('_', ' ').toLowerCase()}</td>
-                <td className="px-4 py-2 text-slate-600">{describe(c)}</td>
+                <td className="px-4 py-2 text-slate-600">{describe(c)}{!c.prorateByAttendance && c.type === 'EARNING' && <span className="ml-2 text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">always full</span>}</td>
                 <td className="px-4 py-2">{c.effectiveFrom.slice(0, 10)}</td>
                 <td className="px-4 py-2"><button disabled={!canManage} onClick={() => toggle(c)}><Badge value={c.active ? 'ACTIVE' : 'INACTIVE'} /></button></td>
                 <td className="px-4 py-2 text-right">{canManage && <button onClick={() => del(c.id)} aria-label="Delete" className="text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>}</td>

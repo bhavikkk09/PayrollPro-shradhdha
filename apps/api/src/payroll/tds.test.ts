@@ -48,8 +48,8 @@ test('monthsLeftInFy counts inclusively to the end of the financial year', () =>
 
 const emp = (o: Partial<EmployeeInput> = {}): EmployeeInput => ({
   employeeId: 'e1', code: 'E1', name: 'T', year: 2025, month: 6, daysInMonth: 30,
-  monthlyLines: [{ code: 'BASIC', name: 'Basic', type: 'EARNING', amount: 40000, method: 'FIXED', flags: { pf: false, esi: false, pt: false, bonus: false, gratuity: false, taxable: true } },
-    { code: 'REIMB', name: 'Reimbursement', type: 'EARNING', amount: 5000, method: 'FIXED', flags: { pf: false, esi: false, pt: false, bonus: false, gratuity: false, taxable: false } }],
+  monthlyLines: [{ code: 'BASIC', name: 'Basic', type: 'EARNING', amount: 40000, method: 'FIXED', flags: { pf: false, esi: false, pt: false, bonus: false, gratuity: false, taxable: true, prorateByAttendance: true } },
+    { code: 'REIMB', name: 'Reimbursement', type: 'EARNING', amount: 5000, method: 'FIXED', flags: { pf: false, esi: false, pt: false, bonus: false, gratuity: false, taxable: false, prorateByAttendance: true } }],
   attendance: { paidDays: 30, salaryDivisor: 30, lopDays: 0, otHours: 0 }, adjustments: [], loans: [], state: null,
   applicable: { pf: false, esi: false, pt: false, lwf: false }, tdsEnabled: true, tds: { ytdTaxable: 80000, ytdTds: 0, monthsRemaining: 10 }, ...o,
 });

@@ -507,6 +507,7 @@ model SalaryComponent {
   ptApplicable Boolean       @default(false)
   bonusApplicable Boolean    @default(false)
   gratuityApplicable Boolean @default(false)
+  prorateByAttendance Boolean @default(true) // false = always pay this earning in full, regardless of days worked
   calcMethod   CalcMethod    @default(FIXED)
   percentage   Decimal?      @db.Decimal(9, 4)
   percentOf    String?       // component code, or GROSS

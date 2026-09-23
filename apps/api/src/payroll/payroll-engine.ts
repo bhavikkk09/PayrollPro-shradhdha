@@ -71,7 +71,8 @@ export function calculateEmployeePayroll(i: EmployeeInput, cfg: EngineConfig): P
   for (const l of i.monthlyLines) {
     if (l.type !== 'EARNING' || l.method === 'HOURLY') continue;
     monthlyBase += l.amount;
-    const earned = money(l.amount * ratio);
+    const prorate = l.flags?.prorateByAttendance !== false; // missing on old snapshots -> prorate, today's behaviour
+    const earned = money(l.amount * (prorate ? ratio : 1));
     earnings.push({ code: l.code, name: l.name, amount: earned, monthly: l.amount, source: 'SALARY' });
     earnedByCode.set(l.code, earned);
     flagsByCode.set(l.code, l.flags);

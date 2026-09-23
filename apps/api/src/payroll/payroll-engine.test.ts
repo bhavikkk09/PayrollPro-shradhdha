@@ -14,7 +14,7 @@ const PT = rule({ id: 'pt1', module: 'PT', state: 'Gujarat', slabs: [{ from: 0, 
 const LWF = rule({ id: 'lwf1', module: 'LWF', rules: { employeeAmount: 6, employerAmount: 12, months: [6, 12] } });
 const cfg = (rules: StatRule[] = [PF, ESI, PT, LWF]): EngineConfig => ({ rounding: 'NEAREST_RUPEE', rules, asOf: '2025-06-30' });
 
-const F = (pf: boolean, esi: boolean, pt: boolean) => ({ pf, esi, pt, bonus: false, gratuity: false, taxable: true });
+const F = (pf: boolean, esi: boolean, pt: boolean, prorateByAttendance = true) => ({ pf, esi, pt, bonus: false, gratuity: false, taxable: true, prorateByAttendance });
 const line = (code: string, amount: number, flags = F(false, true, true), extra: Partial<SalaryLineSnap> = {}): SalaryLineSnap =>
   ({ code, name: code, type: 'EARNING', amount, method: 'FIXED', flags, ...extra });
 const std = (): SalaryLineSnap[] => [line('BASIC', 12000, F(true, true, true)), line('HRA', 6000), line('SPECIAL', 12000)];
@@ -42,6 +42,20 @@ test('LOP prorates earnings by paid days / divisor', () => {
   assert.equal(r.earnings.find((e) => e.code === 'BASIC')!.amount, 10800);
   assert.equal(r.gross, 27000);
   assert.equal(r.ratio, 0.9);
+});
+
+test('prorateByAttendance=false pays a component in full regardless of LOP', () => {
+  const lines = [line('BASIC', 12000, F(true, true, true)), line('FIXED_ALLOW', 3000, F(false, false, false, false))];
+  const r = calculateEmployeePayroll(emp({ monthlyLines: lines, attendance: { paidDays: 15, salaryDivisor: 30, lopDays: 15, otHours: 0 } }), cfg());
+  assert.equal(r.earnings.find((e) => e.code === 'BASIC')!.amount, 6000); // prorated: 12000 x 0.5
+  assert.equal(r.earnings.find((e) => e.code === 'FIXED_ALLOW')!.amount, 3000); // not prorated: full amount
+  assert.equal(r.gross, 9000);
+});
+
+test('a salary snapshot from before this flag existed still prorates (backward compatible default)', () => {
+  const oldSnapshotLine: SalaryLineSnap = { code: 'BASIC', name: 'Basic', type: 'EARNING', amount: 12000, method: 'FIXED', flags: { pf: true, esi: true, pt: true, bonus: false, gratuity: false, taxable: true } as any };
+  const r = calculateEmployeePayroll(emp({ monthlyLines: [oldSnapshotLine], attendance: { paidDays: 15, salaryDivisor: 30, lopDays: 15, otHours: 0 } }), cfg());
+  assert.equal(r.earnings.find((e) => e.code === 'BASIC')!.amount, 6000);
 });
 
 test('PF wage is capped at the rule ceiling', () => {
